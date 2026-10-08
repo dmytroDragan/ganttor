@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ganttor</title>
+<script src="./support.js"></script>
+<script src="./src/unassign-recalc.js"></script>
+<script src="./src/graph-edit.js"></script>
+<script src="./src/graph-row-order.js"></script>
+<script src="./src/graph-epic-order.js"></script>
+<script src="./src/graph-edge-arrow.js"></script>
+<script src="./src/sprint-horizon.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#FBFAF8; }
+  * { box-sizing:border-box; }
+  a { color: oklch(0.52 0.12 255); text-decoration: none; }
+  a:hover { color: oklch(0.42 0.13 255); text-decoration: underline; }
+  input { font-family: inherit; }
+  input:focus { outline: none; }
+  input[type=number]::-webkit-inner-spin-button { opacity:.35; }
+  @keyframes barIn { from { opacity:0; transform: scaleX(.55) translateY(6px); } to { opacity:1; transform: scaleX(1) translateY(0); } }
+  @keyframes toastIn { from { opacity:0; transform: translate(-50%, 14px) scale(.96); } to { opacity:1; transform: translate(-50%, 0) scale(1); } }
+  @keyframes shakeRow { 10%,90%{transform:translateX(-2px)} 30%,70%{transform:translateX(4px)} 50%{transform:translateX(-4px)} 100%{transform:translateX(0)} }
+  @keyframes dashPull { to { stroke-dashoffset: -14; } }
+  @keyframes popIn { from { opacity:0; transform: scale(.9); } to { opacity:1; transform: scale(1); } }
+</style>
+</helmet>
+
+<div style="height:100vh;display:flex;flex-direction:column;font-family:'Instrument Sans',system-ui,sans-serif;background:#FBFAF8;color:#1B1A17;overflow:hidden">
+
+  <header style="flex:0 0 auto;display:flex;align-items:center;gap:28px;padding:14px 24px;background:#FFFFFF;border-bottom:1px solid #EBE7DF">
+    <div style="font-size:18px;font-weight:700;letter-spacing:-0.03em;color:#1B1A17;flex:0 0 auto">ganttor</div>
+    <div style="width:1px;align-self:stretch;background:#EBE7DF;flex:0 0 auto"></div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em">{{ sprintName }}</div>
+      <div style="font-size:11.5px;color:#8A857B">{{ sprintSub }}</div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:22px;margin-left:8px">
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Planned</div>
+        <div style="display:flex;align-items:baseline;gap:5px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600">{{ plannedPts }}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A857B">/ {{ totalPts }} pts</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Team capacity</div>
+        <div style="display:flex;align-items:baseline;gap:5px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600">{{ usedPts }}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A857B">/ {{ teamCap }} pts</span>
+        </div>
+      </div>
+      <div style="width:180px;display:flex;flex-direction:column;gap:7px">
+        <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Fill</div>
+        <div style="position:relative;height:8px;border-radius:99px;background:#F0ECE4;overflow:hidden">
+          <div style="position:absolute;left:0;top:0;bottom:0;border-radius:99px;transition:width .45s cubic-bezier(.2,.9,.3,1);width:{{ fillPct }}%;background:{{ fillColor }}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <button onClick="{{ toggleMultiSprint }}" title="{{ multiTitle }}" style="display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:9px;border:1px solid {{ multiBorder }};background:{{ multiBg }};font-family:inherit;font-size:12.5px;font-weight:600;color:{{ multiInk }};cursor:pointer;transition:background .15s,border-color .15s,color .15s" style-hover="background:{{ multiHover }}">
+        <span style="position:relative;width:22px;height:12px;border-radius:99px;background:{{ multiKnobTrack }};flex:0 0 auto">
+          <span style="position:absolute;top:1px;left:{{ multiKnobLeft }};width:10px;height:10px;border-radius:50%;background:{{ multiKnob }};transition:left .15s"></span>
+        </span>
+        Multi-sprint
+      </button>
+      <button onClick="{{ undo }}" title="Undo (⌘Z)" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:{{ undoColor }};cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px">↺</span> Undo
+      </button>
+      <button onClick="{{ redo }}" title="Redo (⇧⌘Z)" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:{{ redoColor }};cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px">↻</span> Redo
+      </button>
+      <button onClick="{{ clearAll }}" style="padding:8px 13px;border-radius:9px;border:1px solid transparent;background:transparent;font-family:inherit;font-size:12.5px;font-weight:500;color:#8A857B;cursor:pointer;transition:background .15s" style-hover="background:#F4F0E9">Clear board</button>
+      <sc-if value="{{ savedNote }}" hint-placeholder-val="{{ false }}">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#A29C90;white-space:nowrap">{{ savedNote }}</span>
+      </sc-if>
+      <button onClick="{{ downloadTickets }}" title="Download the current backlog (pts and deps) as tickets.json" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:#514C43;cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px">↓</span> Download tickets
+      </button>
+      <button onClick="{{ loadPlan }}" title="Import a previously saved sprint-plan.json" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:#514C43;cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px">↑</span> Load plan
+      </button>
+      <button onClick="{{ savePlan }}" title="Download gantt + capacity plan as JSON" style="display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:9px;border:1px solid #2A2721;background:#2A2721;font-family:inherit;font-size:12.5px;font-weight:600;color:#FBFAF8;cursor:pointer;transition:background .15s,transform .15s" style-hover="background:#413C33" style-active="transform:translateY(1px)">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px">↓</span> Save plan
+      </button>
+    </div>
+  </header>
+
+  <div id="main-split" style="flex:1 1 auto;display:flex;min-height:0">
+
+    <!-- GRAPH -->
+    <section style="flex:{{ graphSectionFlex }};min-width:{{ graphMinW }};display:flex;flex-direction:column;min-height:0;border-right:{{ graphSectionBorder }};background:#FBFAF8">
+      <div style="flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:13px 22px 11px;border-bottom:1px solid #F0ECE4">
+        <div style="font-size:12px;font-weight:600;letter-spacing:.02em">Dependency graph</div>
+        <div style="font-size:11.5px;color:#A29C90">{{ graphHint }}</div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:7px">
+          <button onClick="{{ toggleGraphEdit }}" title="{{ editTitle }}" style="display:flex;align-items:center;gap:8px;padding:6px 11px;border-radius:8px;border:1px solid {{ editBorder }};background:{{ editBg }};font-family:inherit;font-size:12px;font-weight:600;color:{{ editInk }};cursor:pointer;transition:background .15s,border-color .15s,color .15s" style-hover="background:{{ editHover }}">
+            <span style="position:relative;width:22px;height:12px;border-radius:99px;background:{{ editKnobTrack }};flex:0 0 auto">
+              <span style="position:absolute;top:1px;left:{{ editKnobLeft }};width:10px;height:10px;border-radius:50%;background:{{ editKnob }};transition:left .15s"></span>
+            </span>
+            Edit
+          </button>
+          <button onClick="{{ toggleGraphFullscreen }}" title="{{ graphFsTitle }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border-radius:8px;border:1px solid #E4DFD5;background:#FFF;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:#514C43;cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">{{ graphFsIcon }}</button>
+          <span title="Dependency ticket not assigned yet" style="display:inline-flex;align-items:center;gap:5px">
+            <svg width="28" height="8" viewBox="0 0 28 8" aria-hidden="true"><path d="M1.5,4 C10,4 14,4 20,4" fill="none" stroke="#DED8CC" stroke-width="1.5" stroke-linecap="round"></path><polygon points="26,4 20,1.4 20,6.6" fill="#DED8CC"></polygon></svg>
+            <span style="font-size:10.5px;color:#A29C90;letter-spacing:.04em">pending</span>
+          </span>
+          <span title="Dependency ticket already assigned" style="display:inline-flex;align-items:center;gap:5px">
+            <svg width="28" height="8" viewBox="0 0 28 8" aria-hidden="true"><path d="M1.5,4 C10,4 14,4 20,4" fill="none" stroke="#DED8CC" stroke-width="1.5" stroke-dasharray="5 6" stroke-linecap="round"></path><polygon points="26,4 20,1.4 20,6.6" fill="#DED8CC"></polygon></svg>
+            <span style="font-size:10.5px;color:#A29C90;letter-spacing:.04em">scheduled</span>
+          </span>
+          <span title="Edge highlighted when hovering a related ticket" style="display:inline-flex;align-items:center;gap:5px">
+            <svg width="28" height="8" viewBox="0 0 28 8" aria-hidden="true"><path d="M1.5,4 C10,4 14,4 20,4" fill="none" stroke="oklch(0.58 0.12 255)" stroke-width="2" stroke-linecap="round"></path><polygon points="26.4,4 19.6,1.1 19.6,6.9" fill="oklch(0.58 0.12 255)"></polygon></svg>
+            <span style="font-size:10.5px;color:#A29C90;letter-spacing:.04em">hover</span>
+          </span>
+          <span style="width:1px;height:14px;background:#E4DFD5;margin:0 2px"></span>
+          <span style="width:9px;height:9px;border-radius:3px;background:#DCD5C8"></span>
+          <span style="width:15px;height:15px;border-radius:4px;background:#DCD5C8"></span>
+          <span style="font-size:10.5px;color:#A29C90;letter-spacing:.04em">area = story points</span>
+        </div>
+      </div>
+
+      <div id="graph-scroll" style="flex:1 1 auto;overflow:auto;padding:0 22px 40px">
+        <div onClick="{{ onGraphBgClick }}" style="position:relative;width:{{ graphW }}px;height:{{ graphH }}px">
+
+          <sc-for list="{{ columns }}" as="c" hint-placeholder-count="3">
+            <div style="position:absolute;top:12px;left:{{ c.x }}px;width:{{ c.w }}px;display:flex;flex-direction:column;gap:3px;align-items:center">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.1em;color:{{ c.ink }}">{{ c.id }}</div>
+              <div style="font-size:11px;color:#A29C90;text-align:center;line-height:1.2">{{ c.name }}</div>
+            </div>
+          </sc-for>
+
+          <svg style="position:absolute;left:0;top:0;width:{{ graphW }}px;height:{{ graphH }}px;overflow:visible;pointer-events:none">
+            <sc-for list="{{ edges }}" as="e" hint-placeholder-count="6">
+              <g>
+                <path d="{{ e.d }}" fill="none" stroke="{{ e.stroke }}" stroke-width="{{ e.sw }}" stroke-dasharray="{{ e.dash }}" stroke-linecap="round" style="transition:stroke .2s,stroke-width .2s;pointer-events:none"></path>
+                <path d="{{ e.d }}" fill="none" stroke="transparent" stroke-width="12" stroke-linecap="round" onClick="{{ e.onClick }}" style="pointer-events:{{ e.hitEvents }};cursor:{{ e.cursor }}"></path>
+                <polygon points="{{ e.arrow }}" fill="{{ e.stroke }}" style="transition:fill .2s;pointer-events:none"></polygon>
+              </g>
+            </sc-for>
+          </svg>
+
+          <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="18">
+            <div draggable="{{ n.draggable }}" onDragStart="{{ n.onDragStart }}" onDragEnd="{{ n.onDragEnd }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" onClick="{{ n.onClick }}" title="{{ n.tip }}"
+              style="position:absolute;left:{{ n.x }}px;top:{{ n.y }}px;width:{{ n.w }}px;height:{{ n.h }}px;z-index:{{ n.z }};display:flex;flex-direction:column;justify-content:space-between;overflow:{{ n.overflow }};padding:{{ n.pad }};border-radius:13px;cursor:{{ n.cursor }};user-select:none;background:{{ n.bg }};border:{{ n.border }};box-shadow:{{ n.shadow }};opacity:{{ n.opacity }};transform:{{ n.transform }};transition:left .28s ease,top .28s ease,width .28s ease,height .28s ease,transform .2s cubic-bezier(.2,.9,.3,1.4),box-shadow .2s,opacity .35s,background .3s,border-color .3s">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:{{ n.keyFont }}px;font-weight:600;letter-spacing:.02em;white-space:nowrap;color:{{ n.ink }}">{{ n.id }}</span>
+                <sc-if value="{{ n.showChip }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;padding:1px 5px;border-radius:5px;letter-spacing:.06em;white-space:nowrap;background:{{ n.chipBg }};color:{{ n.ink }}">{{ n.tshirt }}</span>
+                </sc-if>
+              </div>
+              <sc-if value="{{ n.showTitle }}" hint-placeholder-val="{{ true }}">
+                <div style="font-size:11.5px;line-height:1.22;font-weight:500;color:#3A362F;text-wrap:pretty;overflow:hidden">{{ n.title }}</div>
+              </sc-if>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
+                <sc-if value="{{ n.showSteppers }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:flex;align-items:center;gap:4px">
+                    <span onClick="{{ n.onStepDown }}" title="Smaller" style="display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;border:1px solid #E4DFD5;background:#FFF;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:{{ n.stepDownColor }};cursor:{{ n.stepDownCursor }}">−</span>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;color:#514C43;white-space:nowrap">{{ n.ptsLabel }}</span>
+                    <span onClick="{{ n.onStepUp }}" title="Larger" style="display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;border:1px solid #E4DFD5;background:#FFF;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:{{ n.stepUpColor }};cursor:{{ n.stepUpCursor }}">+</span>
+                  </span>
+                </sc-if>
+                <sc-if value="{{ n.showMeta }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#8A857B">{{ n.meta }}</span>
+                </sc-if>
+                <sc-if value="{{ n.owner }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{{ n.ownerBg }};color:#fff;animation:popIn .3s ease both">{{ n.owner }}</span>
+                </sc-if>
+              </div>
+            </div>
+          </sc-for>
+
+        </div>
+      </div>
+    </section>
+
+    <sc-if value="{{ showSplitBar }}" hint-placeholder-val="{{ true }}">
+      <div onPointerDown="{{ onSplitPointerDown }}" title="Drag to resize"
+        style="flex:0 0 6px;width:6px;align-self:stretch;cursor:col-resize;background:{{ splitBarBg }};display:flex;align-items:center;justify-content:center;transition:background .15s;z-index:2"
+        style-hover="background:#D8D2C6">
+        <span style="width:2px;height:28px;border-radius:99px;background:{{ splitGripBg }}"></span>
+      </div>
+    </sc-if>
+
+    <!-- GANTT -->
+    <sc-if value="{{ showGantt }}" hint-placeholder-val="{{ true }}">
+    <section style="flex:1 1 auto;display:flex;flex-direction:column;min-height:0;min-width:0;background:#FFFFFF;overflow:auto">
+     <div style="min-width:{{ ganttMinW }}px;display:flex;flex-direction:column">
+      <div style="position:sticky;top:0;z-index:3;flex:0 0 auto;display:flex;align-items:stretch;border-bottom:1px solid #EBE7DF;background:#FFFFFF">
+        <div style="flex:0 0 232px;width:232px;max-width:232px;min-width:232px;position:sticky;left:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 12px 11px 18px;font-size:12px;font-weight:600;border-right:1px solid #F2EEE7;background:#FFFFFF">
+          <span>Team</span>
+          <sc-if value="{{ showZoom }}" hint-placeholder-val="{{ false }}">
+            <span style="display:flex;align-items:center;gap:4px">
+              <button onClick="{{ zoomOut }}" title="Zoom out" style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border-radius:7px;border:1px solid #E4DFD5;background:#FFF;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:{{ zoomOutColor }};cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">−</button>
+              <button onClick="{{ zoomIn }}" title="Zoom in" style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border-radius:7px;border:1px solid #E4DFD5;background:#FFF;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:{{ zoomInColor }};cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">+</button>
+            </span>
+          </sc-if>
+        </div>
+        <div style="flex:1 1 auto;display:flex;flex-direction:column;min-width:0">
+          <sc-if value="{{ showBands }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;min-height:22px">
+              <sc-for list="{{ bands }}" as="b" hint-placeholder-count="2">
+                <div style="flex:{{ b.flex }};min-width:{{ b.minW }};display:flex;align-items:center;justify-content:center;padding:4px 6px;border-left:2px solid #D8D2C6;background:{{ b.bg }};font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.04em;color:#6B655A;white-space:nowrap">{{ b.label }}</div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="display:flex;min-width:0">
+            <sc-for list="{{ days }}" as="d" hint-placeholder-count="10">
+              <div style="flex:1 0 {{ dayPx }}px;min-width:{{ dayPx }}px;display:flex;flex-direction:column;align-items:center;gap:1px;padding:9px 2px;border-left:1px solid {{ d.line }}">
+                <span style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#A29C90">{{ d.dow }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#514C43">{{ d.date }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1 1 auto">
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+          <div style="display:flex;align-items:stretch;border-bottom:1px solid #F2EEE7;background:{{ r.rowBg }};animation:{{ r.anim }};transition:background .2s">
+            <div style="flex:0 0 232px;width:232px;max-width:232px;min-width:232px;overflow:hidden;position:sticky;left:0;z-index:2;display:flex;flex-direction:column;gap:7px;padding:13px 16px 13px 18px;border-right:1px solid #F2EEE7;background:{{ r.rowBg }}">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;color:#fff;background:{{ r.avatarBg }}">{{ r.initials }}</span>
+                <input value="{{ r.name }}" onChange="{{ r.onName }}" spellcheck="false" style="flex:1 1 auto;min-width:0;border:1px solid transparent;border-radius:6px;padding:3px 5px;margin-left:-5px;background:transparent;font-size:12.5px;font-weight:600;color:#1B1A17;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE" style-focus="background:#FFF;border-color:#D8D2C6">
+                <button onClick="{{ r.onRemove }}" title="Remove" style="flex:0 0 auto;width:20px;height:20px;border:none;border-radius:6px;background:transparent;color:#C6BFB2;font-size:13px;line-height:1;cursor:pointer;transition:background .15s,color .15s" style-hover="background:#F4EDEA;color:oklch(0.55 0.17 27)">×</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="position:relative;flex:1 1 auto;height:6px;border-radius:99px;background:#F0ECE4;overflow:hidden">
+                  <div style="position:absolute;left:0;top:0;bottom:0;border-radius:99px;transition:width .45s cubic-bezier(.2,.9,.3,1),background .25s;width:{{ r.pct }}%;background:{{ r.capColor }}"></div>
+                </div>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;color:{{ r.capInk }};white-space:nowrap">{{ r.used }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#B5AEA1">/</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;color:#514C43;white-space:nowrap">{{ r.den }}</span>
+                <input type="number" min="0" value="{{ r.cap }}" onChange="{{ r.onCap }}" title="Points per sprint" style="width:38px;border:1px solid transparent;border-radius:6px;padding:2px 3px;background:transparent;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;color:#514C43;text-align:right;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE" style-focus="background:#FFF;border-color:#D8D2C6">
+              </div>
+            </div>
+
+            <div onDragOver="{{ r.onDragOver }}" onDragLeave="{{ r.onDragLeave }}" onDrop="{{ r.onDrop }}" style="position:relative;flex:1 1 auto;min-width:0;height:{{ rowH }}px">
+              <div style="position:absolute;inset:0;display:flex">
+                <sc-for list="{{ days }}" as="d" hint-placeholder-count="10">
+                  <div style="flex:1 0 {{ dayPx }}px;min-width:{{ dayPx }}px;border-left:1px solid {{ d.line }}"></div>
+                </sc-for>
+              </div>
+
+              <sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="0">
+                <div onClick="{{ b.onClick }}" onMouseEnter="{{ b.onEnter }}" onMouseLeave="{{ b.onLeave }}" title="{{ b.tip }}"
+                  style="position:absolute;top:{{ barTop }}px;height:{{ barH }}px;left:{{ b.left }}%;width:{{ b.width }}%;display:flex;align-items:center;gap:6px;padding:0 9px;border-radius:9px;cursor:pointer;overflow:hidden;background:{{ b.bg }};border:{{ b.border }};box-shadow:{{ b.shadow }};transform:{{ b.transform }};animation:barIn .4s cubic-bezier(.2,.9,.3,1.35) both;transition:transform .18s,box-shadow .18s">
+                  <sc-if value="{{ b.showLabel }}" hint-placeholder-val="{{ true }}">
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;white-space:nowrap;color:{{ b.ink }}">{{ b.id }}</span>
+                  </sc-if>
+                  <sc-if value="{{ b.showTitle }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ b.ink }};opacity:.72">{{ b.title }}</span>
+                  </sc-if>
+                  <sc-if value="{{ b.warn }}" hint-placeholder-val="{{ false }}">
+                    <span title="{{ b.warn }}" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:oklch(0.52 0.16 55)">!</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+
+              <sc-if value="{{ r.preview }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;top:{{ barTop }}px;height:{{ barH }}px;left:{{ r.preview.left }}%;width:{{ r.preview.width }}%;display:flex;align-items:center;justify-content:center;border-radius:9px;pointer-events:none;background:{{ r.preview.bg }};border:{{ r.preview.border }};animation:popIn .16s ease both">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.02em;white-space:nowrap;color:{{ r.preview.ink }}">{{ r.preview.label }}</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ r.blocked }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;right:12px;top:{{ barTop }}px;height:{{ barH }}px;display:flex;align-items:center;padding:0 11px;border-radius:9px;pointer-events:none;background:oklch(0.96 0.03 27);border:1px solid oklch(0.86 0.08 27);animation:popIn .16s ease both">
+                  <span style="font-size:11px;font-weight:600;color:oklch(0.48 0.16 27);white-space:nowrap">{{ r.blocked }}</span>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="display:flex;align-items:stretch">
+          <div style="flex:0 0 232px;width:232px;max-width:232px;min-width:232px;position:sticky;left:0;z-index:2;padding:12px 18px;border-right:1px solid #F2EEE7;background:#FFFFFF">
+            <button onClick="{{ addPerson }}" style="display:flex;align-items:center;gap:8px;width:100%;padding:9px 11px;border-radius:9px;border:1px dashed #DCD5C8;background:transparent;font-family:inherit;font-size:12px;font-weight:600;color:#8A857B;cursor:pointer;transition:background .15s,border-color .15s,color .15s" style-hover="background:#FAF7F1;border-color:#B5AEA1;color:#514C43">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px">+</span> Add teammate
+            </button>
+          </div>
+          <div style="flex:1 1 auto"></div>
+        </div>
+      </div>
+     </div>
+    </section>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:50%;bottom:26px;display:flex;align-items:center;gap:11px;padding:11px 17px;border-radius:11px;animation:toastIn .26s cubic-bezier(.2,.9,.3,1.3) both;background:{{ toast.bg }};border:{{ toast.border }};box-shadow:0 12px 34px rgba(40,34,22,.16)">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:{{ toast.ink }}">{{ toast.icon }}</span>
+      <span style="font-size:12.5px;font-weight:500;color:{{ toast.ink }};text-wrap:pretty">{{ toast.msg }}</span>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;sprintDays&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:10,&quot;min&quot;:5,&quot;max&quot;:15,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Sprint&quot;},&quot;strictDependencies&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Rules&quot;},&quot;nodeScale&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.7,&quot;max&quot;:1.4,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Graph&quot;}}">
+class Component extends DCLogic {
+  SPRINT = { name: 'Sprint 24 — Checkout Revamp', start: '2026-08-10', days: 10 };
+
+  EPICS = [
+    { id: 'CHK', name: 'Checkout Flow Rebuild', hue: 255 },
+    { id: 'PAY', name: 'Payments Service', hue: 155 },
+    { id: 'ORD', name: 'Order Confirmation', hue: 65 }
+  ];
+
+  SIZES = { 1: { t: 'XS', d: 1 }, 2: { t: 'S', d: 2 }, 3: { t: 'M', d: 3 }, 5: { t: 'M', d: 5 }, 8: { t: 'L', d: 8 } };
+
+  TICKETS = [
+    { id: 'CHK-101', epic: 'CHK', title: 'Design token audit', pts: 1, deps: [] },
+    { id: 'CHK-102', epic: 'CHK', title: 'Cart summary component', pts: 3, deps: ['CHK-101'] },
+    { id: 'CHK-103', epic: 'CHK', title: 'Address form + validation', pts: 5, deps: ['CHK-101'] },
+    { id: 'CHK-104', epic: 'CHK', title: 'Payment step UI', pts: 5, deps: ['CHK-102', 'PAY-201'] },
+    { id: 'CHK-105', epic: 'CHK', title: 'Review & place order', pts: 3, deps: ['CHK-103', 'CHK-104'] },
+    { id: 'CHK-106', epic: 'CHK', title: 'Responsive pass', pts: 2, deps: ['CHK-105'] },
+    { id: 'PAY-201', epic: 'PAY', title: 'Tokenization contract', pts: 2, deps: [] },
+    { id: 'PAY-202', epic: 'PAY', title: 'Card vault integration', pts: 8, deps: ['PAY-201'] },
+    { id: 'PAY-205', epic: 'PAY', title: 'Idempotency keys', pts: 2, deps: ['PAY-201'] },
+    { id: 'PAY-203', epic: 'PAY', title: '3-D Secure challenge', pts: 5, deps: ['PAY-202'] },
+    { id: 'PAY-204', epic: 'PAY', title: 'Refund endpoint', pts: 3, deps: ['PAY-202'] },
+    { id: 'PAY-206', epic: 'PAY', title: 'Failure retry policy', pts: 3, deps: ['PAY-203', 'PAY-205'] },
+    { id: 'ORD-301', epic: 'ORD', title: 'Order event schema', pts: 1, deps: [] },
+    { id: 'ORD-302', epic: 'ORD', title: 'Confirmation email', pts: 2, deps: ['ORD-301'] },
+    { id: 'ORD-303', epic: 'ORD', title: 'Receipt PDF service', pts: 5, deps: ['ORD-301', 'PAY-204'] },
+    { id: 'ORD-304', epic: 'ORD', title: 'Order status webhook', pts: 3, deps: ['ORD-301', 'PAY-206'] },
+    { id: 'ORD-305', epic: 'ORD', title: 'Post-purchase upsell', pts: 2, deps: ['CHK-105'] },
+    { id: 'ORD-306', epic: 'ORD', title: 'E2E happy-path suite', pts: 8, deps: ['CHK-106', 'ORD-304'] }
+  ];
+
+  AVATARS = ['oklch(0.62 0.13 255)', 'oklch(0.62 0.13 155)', 'oklch(0.62 0.13 65)', 'oklch(0.62 0.13 320)', 'oklch(0.62 0.13 200)', 'oklch(0.62 0.13 20)'];
+
+  state = {
+    people: [
+      { id: 'p1', name: 'Maya Okonkwo', cap: 21 },
+      { id: 'p2', name: 'Liam Petrov', cap: 26 },
+      { id: 'p3', name: 'Sofia Reyes', cap: 18 },
+      { id: 'p4', name: 'Dev Rao', cap: 13 }
+    ],
+    assign: {},
+    past: [], future: [],
+    toast: null, dragId: null, overRow: null, hover: null, shake: null,
+    source: 'built-in sample data', savedAt: null,
+    graphFullscreen: false,
+    graphWidthPx: 640,
+    resizingSplit: false,
+    multiSprint: false,
+    ganttDayPx: 58,
+    graphEdit: false,
+    pendingParent: null
+  };
+
+  nextPid = 5;
+
+  async loadData() {
+    const grab = async (url) => {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(url + ' → ' + res.status);
+      return res.json();
+    };
+    const [tk, tm] = await Promise.allSettled([grab('./data/tickets.json'), grab('./data/team.json')]);
+    const got = [];
+    if (tk.status === 'fulfilled' && tk.value) {
+      const d = tk.value;
+      if (d.sprint) this.SPRINT = Object.assign({}, this.SPRINT, d.sprint);
+      if (Array.isArray(d.epics) && d.epics.length) this.EPICS = d.epics;
+      if (d.sizes) {
+        const sz = {};
+        Object.keys(d.sizes).forEach(k => { sz[k] = { t: d.sizes[k].tshirt, d: d.sizes[k].days }; });
+        this.SIZES = sz;
+      }
+      if (Array.isArray(d.tickets) && d.tickets.length) {
+        this.TICKETS = d.tickets.map(t => Object.assign({ deps: [] }, t, { pts: t.pts == null ? 1 : t.pts }));
+      }
+      got.push('tickets.json');
+    }
+    if (tm.status === 'fulfilled' && tm.value) {
+      const list = Array.isArray(tm.value) ? tm.value : (tm.value.team || tm.value.people || []);
+      if (list.length) {
+        const people = list.map((p, i) => ({ id: p.id || ('p' + (i + 1)), name: p.name || 'Teammate', role: p.role || '', cap: p.capacity ?? p.cap ?? 20 }));
+        this.nextPid = this.maxNextPid(people);
+        this.setState({ people });
+      }
+      got.push('team.json');
+    }
+    this.setState({ source: got.length ? got.join(' · ') : 'built-in sample data (files not readable)' });
+    if (got.length < 2) this.say('warn', 'Could not read ' + (got.includes('tickets.json') ? 'team.json' : 'tickets.json') + ' — using built-in data');
+    try {
+      const plan = await grab('./data/sprint-plan.json');
+      // Skip auto-load if the user already edited the board while fetches were in flight.
+      if (plan && !Object.keys(this.state.assign).length && !this.state.past.length) {
+        this.applyPlan(plan, 'sprint-plan.json');
+      }
+    } catch (_) { /* optional — absent or unreadable plan is fine */ }
+    this.forceUpdate();
+  }
+
+  loadPlan = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        let data;
+        try { data = JSON.parse(reader.result); }
+        catch (err) { this.say('error', 'That file is not valid JSON'); return; }
+        this.applyPlan(data, file.name);
+      };
+      reader.onerror = () => this.say('error', 'Could not read that file');
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  applyPlan(data, filename) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      this.say('error', `${filename} is not a plan object`);
+      return;
+    }
+    const gantt = Array.isArray(data.gantt) ? data.gantt : [];
+    const plan = Array.isArray(data.capacityPlan) ? data.capacityPlan : [];
+    if (!gantt.length && !plan.length) { this.say('error', `${filename} has no gantt or capacityPlan`); return; }
+    if (data.sprint) this.SPRINT = Object.assign({}, this.SPRINT, {
+      name: data.sprint.name || this.SPRINT.name,
+      start: data.sprint.start || this.SPRINT.start,
+      days: data.sprint.workingDays || data.sprint.days || this.SPRINT.days
+    });
+
+    const people = plan.length
+      ? plan.map((p, i) => ({ id: p.id || ('p' + (i + 1)), name: p.name || 'Teammate', cap: p.capacityPts ?? p.capacity ?? p.cap ?? 20 }))
+      : this.state.people;
+    const byId = {}; people.forEach(p => { byId[p.id] = p; });
+    const byName = {}; people.forEach(p => { byName[p.name.trim().toLowerCase()] = p; });
+
+    const assign = {}; const skipped = [];
+    gantt.forEach(g => {
+      const t = this.ticket(g.ticket);
+      const p = byId[g.assigneeId] || byName[(g.assignee || '').trim().toLowerCase()];
+      if (!t || !p) { skipped.push(g.ticket || '?'); return; }
+      const start = g.startDay != null ? Math.max(0, g.startDay - 1) : (g.start ?? 0);
+      // Always derive duration from current story-point → days sizes (ignore stale durationDays).
+      assign[t.id] = { personId: p.id, start, days: this.days(t.pts) };
+    });
+    const multiSprint = !!(data.sprint && data.sprint.multiSprint);
+    let packed = UnassignRecalc.repackAssign(
+      assign, people, this.TICKETS,
+      (t, pid, a, p) => SprintHorizon.planAssignment(t, pid, a, p, this.TICKETS, {
+        sprintDays: this.sprintDays(),
+        maxSprints: multiSprint ? SprintHorizon.MAX_SPRINTS : 1,
+        daysOf: (pts) => this.days(pts),
+        strict: this.strict()
+      })
+    );
+    if (!multiSprint) packed = SprintHorizon.stripLaterSprints(packed, this.sprintDays());
+
+    this.nextPid = this.maxNextPid(people);
+    this.commit(() => ({ people, assign: packed, multiSprint }));
+    this.setState({ source: filename, savedAt: null });
+    this.say(skipped.length ? 'warn' : 'ok',
+      `Loaded ${Object.keys(assign).length} scheduled ticket${Object.keys(assign).length === 1 ? '' : 's'} from ${filename}${skipped.length ? ` · skipped ${skipped.join(', ')}` : ''}`);
+  }
+
+  savePlan = () => {
+    const s = this.state, sprint = this.sprintDays();
+    const nVisible = s.multiSprint
+      ? SprintHorizon.visibleSprintCount(s.assign, sprint, SprintHorizon.MAX_SPRINTS)
+      : 1;
+    const dates = this.sprintDates(sprint * nVisible);
+    const iso = (offset) => {
+      const d = dates[Math.min(dates.length - 1, Math.max(0, Math.floor(offset)))];
+      if (!d || isNaN(d.getTime())) return null;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const gantt = Object.keys(s.assign).sort((a, b) => s.assign[a].start - s.assign[b].start).map(id => {
+      const a = s.assign[id], t = this.ticket(id);
+      const person = s.people.find(p => p.id === a.personId);
+      const unmet = t.deps.filter(d => { const da = s.assign[d]; return !da || da.start + da.days > a.start + 1e-9; });
+      return {
+        ticket: id, epic: t.epic, title: t.title, points: t.pts,
+        assignee: person ? person.name : null, assigneeId: a.personId,
+        startDay: +(a.start + 1).toFixed(2), endDay: +(a.start + a.days).toFixed(2),
+        durationDays: a.days, startDate: iso(a.start), endDate: iso(a.start + a.days - 0.01),
+        dependencies: t.deps, unmetDependencies: unmet
+      };
+    });
+    const capHorizon = p => p.cap * nVisible;
+    const capacity = s.people.map(p => {
+      const used = this.usedBy(p.id, s.assign);
+      const cap = capHorizon(p);
+      return {
+        id: p.id, name: p.name, capacityPts: p.cap, plannedPts: used,
+        remainingPts: cap - used,
+        utilization: cap ? +((used / cap) * 100).toFixed(1) : null,
+        overCommitted: used > cap,
+        tickets: gantt.filter(g => g.assigneeId === p.id).map(g => g.ticket)
+      };
+    });
+    const teamHorizon = s.people.reduce((a, p) => a + capHorizon(p), 0);
+    const out = {
+      generatedAt: new Date().toISOString(),
+      sprint: { name: this.SPRINT.name, start: this.SPRINT.start, workingDays: sprint, multiSprint: !!s.multiSprint },
+      totals: {
+        backlogPts: this.TICKETS.reduce((a, t) => a + t.pts, 0),
+        plannedPts: gantt.reduce((a, g) => a + g.points, 0),
+        teamCapacityPts: teamHorizon,
+        unplannedTickets: this.TICKETS.filter(t => !s.assign[t.id]).map(t => t.id)
+      },
+      capacityPlan: capacity,
+      gantt
+    };
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sprint-plan.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    this.setState({ savedAt: new Date() });
+    this.say('ok', `Saved sprint-plan.json — ${gantt.length} scheduled ticket${gantt.length === 1 ? '' : 's'}`);
+  };
+
+  componentDidMount() {
+    this.loadData().catch(() => this.setState({ source: 'built-in sample data (load failed)' }));
+    this._key = (e) => {
+      if (e.key === 'Escape') {
+        if (this.state.pendingParent) {
+          e.preventDefault();
+          this.setState({ pendingParent: null });
+          return;
+        }
+        if (this.state.graphFullscreen) {
+          e.preventDefault();
+          this.setState({ graphFullscreen: false });
+        }
+        return;
+      }
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta || e.key.toLowerCase() !== 'z') return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+      if (e.shiftKey) this.redo(); else this.undo();
+    };
+    window.addEventListener('keydown', this._key);
+    this._onResize = () => { if (this.state.graphFullscreen) this.forceUpdate(); };
+    window.addEventListener('resize', this._onResize);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._key);
+    window.removeEventListener('resize', this._onResize);
+    this.endSplitDrag(true);
+    clearTimeout(this._tt);
+    clearTimeout(this._st);
+  }
+
+  clampGraphWidth(px, rowW, barW = 6, gMin = 280, tMin = 320) {
+    const max = Math.max(gMin, (rowW || 0) - tMin - barW);
+    return Math.min(Math.max(px, gMin), max);
+  }
+
+  endSplitDrag = (fromUnmount) => {
+    if (!this._splitting) return;
+    this._splitting = false;
+    this._splitRow = null;
+    window.removeEventListener('pointermove', this._onSplitMove);
+    window.removeEventListener('pointerup', this._onSplitUp);
+    window.removeEventListener('pointercancel', this._onSplitUp);
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    if (!fromUnmount) this.setState({ resizingSplit: false });
+  };
+
+  _onSplitMove = (e) => {
+    if (!this._splitting || !this._splitRow) return;
+    const rect = this._splitRow.getBoundingClientRect();
+    const w = this.clampGraphWidth(e.clientX - rect.left, rect.width);
+    this.setState({ graphWidthPx: w });
+  };
+
+  _onSplitUp = () => { this.endSplitDrag(); };
+
+  onSplitPointerDown = (e) => {
+    if (this.state.graphFullscreen) return;
+    e.preventDefault();
+    const row = typeof document !== 'undefined' ? document.getElementById('main-split') : null;
+    if (!row) return;
+    this._splitRow = row;
+    this._splitting = true;
+    this.setState({ resizingSplit: true });
+    if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) {
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+    window.addEventListener('pointermove', this._onSplitMove);
+    window.addEventListener('pointerup', this._onSplitUp);
+    window.addEventListener('pointercancel', this._onSplitUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  ticket(id) { return this.TICKETS.find(t => t.id === id); }
+  epic(id) { return this.EPICS.find(e => e.id === id); }
+  days(pts) { const s = this.SIZES[pts]; return s ? s.d : pts; }
+  sprintDays() { return Math.max(3, this.SPRINT.days ?? this.props.sprintDays ?? 10); }
+
+  maxNextPid(people) {
+    let m = 0;
+    (people || []).forEach(p => {
+      const n = parseInt(String(p.id || '').replace(/^p/i, ''), 10);
+      if (!isNaN(n)) m = Math.max(m, n);
+    });
+    return m + 1;
+  }
+
+  horizonDays() {
+    const sprint = this.sprintDays();
+    if (!this.state.multiSprint) return sprint;
+    return sprint * SprintHorizon.visibleSprintCount(this.state.assign, sprint, SprintHorizon.MAX_SPRINTS);
+  }
+
+  sprintDates(n) {
+    const count = n == null ? this.horizonDays() : n;
+    const out = [];
+    const d = new Date((this.SPRINT.start || '2026-08-10') + 'T00:00:00');
+    let guard = 0;
+    while (out.length < count && guard++ < 800) {
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) out.push(new Date(d));
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
+  strict() { return this.props.strictDependencies ?? true; }
+
+  usedBy(pid, assign) {
+    return Object.keys(assign).filter(k => assign[k].personId === pid)
+      .reduce((s, k) => s + this.ticket(k).pts, 0);
+  }
+
+  say(kind, msg) {
+    clearTimeout(this._tt);
+    this.setState({ toast: { kind, msg } });
+    this._tt = setTimeout(() => this.setState({ toast: null }), 3000);
+  }
+
+  snapBoard(s) {
+    return {
+      people: s.people,
+      assign: s.assign,
+      multiSprint: !!s.multiSprint,
+      tickets: GraphEdit.cloneTickets(this.TICKETS)
+    };
+  }
+
+  boardFromSnap(snap) {
+    if (snap.tickets) this.TICKETS = GraphEdit.cloneTickets(snap.tickets);
+    this.nextPid = this.maxNextPid(snap.people);
+    return { people: snap.people, assign: snap.assign, multiSprint: !!snap.multiSprint };
+  }
+
+  commit(fn) {
+    this.setState(s => {
+      const snap = this.snapBoard(s);
+      const patch = fn(s) || {};
+      if (patch.tickets) this.TICKETS = patch.tickets;
+      const rest = Object.assign({}, patch);
+      delete rest.tickets;
+      return Object.assign({ past: [...s.past, snap].slice(-80), future: [] }, rest);
+    });
+  }
+
+  undo = () => {
+    if (!this.state.past.length) { this.say('info', 'Nothing to undo'); return; }
+    this.setState(s => {
+      const prev = s.past[s.past.length - 1];
+      const cur = this.snapBoard(s);
+      return Object.assign(this.boardFromSnap(prev), { past: s.past.slice(0, -1), future: [...s.future, cur] });
+    });
+    this.say('info', 'Undone');
+  };
+
+  redo = () => {
+    if (!this.state.future.length) { this.say('info', 'Nothing to redo'); return; }
+    this.setState(s => {
+      const nxt = s.future[s.future.length - 1];
+      const cur = this.snapBoard(s);
+      return Object.assign(this.boardFromSnap(nxt), { future: s.future.slice(0, -1), past: [...s.past, cur] });
+    });
+    this.say('info', 'Redone');
+  };
+
+  toggleGraphFullscreen = () => {
+    this.setState(s => ({ graphFullscreen: !s.graphFullscreen }), () => {
+      requestAnimationFrame(() => this.forceUpdate());
+    });
+  };
+
+  toggleGraphEdit = () => {
+    this.setState(s => ({ graphEdit: !s.graphEdit, pendingParent: null }));
+  };
+
+  onGraphBgClick = () => {
+    if (this.state.pendingParent) this.setState({ pendingParent: null });
+  };
+
+  planWithTickets(tickets, t, pid, assign, people) {
+    return SprintHorizon.planAssignment(t, pid, assign, people, tickets, {
+      sprintDays: this.sprintDays(),
+      maxSprints: this.state.multiSprint ? SprintHorizon.MAX_SPRINTS : 1,
+      daysOf: (pts) => this.days(pts),
+      strict: this.strict()
+    });
+  }
+
+  applyGraphEdit(nextTickets, addedDep, okMsg) {
+    const s = this.state;
+    const { assign, returned } = GraphEdit.refreshAssign(
+      s.assign, s.people, nextTickets,
+      (t, pid, a, p) => this.planWithTickets(nextTickets, t, pid, a, p),
+      addedDep || null
+    );
+    this.commit(() => ({ tickets: nextTickets, assign }));
+    if (returned.length) {
+      this.say('info', `${okMsg} · ${returned.join(', ')} returned to the graph`);
+    } else {
+      this.say('ok', okMsg);
+    }
+  }
+
+  onGraphTicketClick(id) {
+    const pending = this.state.pendingParent;
+    if (!pending) {
+      this.setState({ pendingParent: id });
+      this.say('info', `${id} selected · click a child`);
+      return;
+    }
+    if (pending === id) {
+      this.setState({ pendingParent: null });
+      this.say('info', 'Selection cleared');
+      return;
+    }
+    const { tickets: next, error } = GraphEdit.addDep(this.TICKETS, pending, id);
+    if (error === 'self') { this.say('error', 'Cannot depend on itself'); return; }
+    if (error === 'cycle') { this.say('error', `Would cycle: ${pending} → … → ${id}`); return; }
+    if (error === 'duplicate') { this.say('info', 'Already depends'); return; }
+    this.setState({ pendingParent: null });
+    this.applyGraphEdit(next, { parentId: pending, childId: id }, `${id} now needs ${pending}`);
+  }
+
+  stepEstimate(id, dir) {
+    const t = this.ticket(id);
+    if (!t) return;
+    const nextPts = GraphEdit.stepPts(t.pts, this.SIZES, dir);
+    if (nextPts === t.pts) return;
+    const next = GraphEdit.setPts(this.TICKETS, id, nextPts);
+    this.applyGraphEdit(next, null, `${id} → ${nextPts} pts`);
+  }
+
+  onEdgeClick(parentId, childId, e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    if (!this.state.graphEdit) return;
+    const next = GraphEdit.removeDep(this.TICKETS, parentId, childId);
+    this.applyGraphEdit(next, null, `${childId} no longer needs ${parentId}`);
+  }
+
+  downloadTickets = () => {
+    const out = GraphEdit.exportTickets(this.SPRINT, this.SIZES, this.EPICS, this.TICKETS);
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tickets.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    this.say('ok', `Downloaded tickets.json — ${this.TICKETS.length} ticket${this.TICKETS.length === 1 ? '' : 's'}`);
+  };
+
+  clearAll = () => {
+    if (!Object.keys(this.state.assign).length) { this.say('info', 'Board is already empty'); return; }
+    this.commit(() => ({ assign: {} }));
+    this.say('info', 'Board cleared — ⌘Z to bring it back');
+  };
+
+  toggleMultiSprint = () => {
+    const sprint = this.sprintDays();
+    this.commit(s => {
+      if (s.multiSprint) {
+        const next = SprintHorizon.stripLaterSprints(s.assign, sprint);
+        const n = Object.keys(s.assign).length - Object.keys(next).length;
+        this._toggleNote = n ? `Multi-sprint off — ${n} ticket${n === 1 ? '' : 's'} returned to the graph` : 'Multi-sprint off';
+        return { multiSprint: false, assign: next };
+      }
+      this._toggleNote = 'Multi-sprint on — tickets that cannot fit shift to the next sprint';
+      return { multiSprint: true };
+    });
+    this.say('info', this._toggleNote || 'Multi-sprint');
+  };
+
+  zoomOut = () => {
+    this.setState(s => ({ ganttDayPx: SprintHorizon.stepDayPx(s.ganttDayPx, -1) }));
+  };
+  zoomIn = () => {
+    this.setState(s => ({ ganttDayPx: SprintHorizon.stepDayPx(s.ganttDayPx, 1) }));
+  };
+
+  plan(t, pid, assign, people) {
+    return this.planWithTickets(this.TICKETS, t, pid, assign, people);
+  }
+
+  drop = (pid) => {
+    const t = this.ticket(this.state.dragId);
+    this.setState({ overRow: null, dragId: null });
+    if (!t || this.state.assign[t.id]) return;
+    const r = this.plan(t, pid, this.state.assign, this.state.people);
+    if (r.error) {
+      this.say('error', r.error);
+      clearTimeout(this._st);
+      this.setState({ shake: pid });
+      this._st = setTimeout(() => this.setState({ shake: null }), 520);
+      return;
+    }
+    const p = this.state.people.find(x => x.id === pid);
+    this.commit(s => ({ assign: Object.assign({}, s.assign, { [t.id]: { personId: pid, start: r.start, days: r.days } }) }));
+    const sprint = this.sprintDays();
+    const si = SprintHorizon.sprintIndex(r.start, sprint);
+    const dayIn = r.start - si * sprint + 1;
+    const when = si > 0
+      ? `sprint ${si + 1} day ${dayIn.toFixed(dayIn % 1 ? 1 : 0)}`
+      : `day ${dayIn.toFixed(dayIn % 1 ? 1 : 0)}`;
+    this.say(r.warn ? 'warn' : 'ok', `${t.id} → ${p.name.trim().split(' ')[0]}, ${when}${r.warn ? ' · dependency not scheduled yet' : ''}`);
+  };
+
+  unassign(id) {
+    const s = this.state;
+    const { assign, removed } = UnassignRecalc.applyUnassign(
+      id, s.assign, s.people, this.TICKETS,
+      (t, pid, a, p) => this.plan(t, pid, a, p)
+    );
+    this.commit(() => ({ assign }));
+    const extra = [...removed].filter(x => x !== id);
+    this.say('info', extra.length
+      ? `${id} returned to the graph · also ${extra.join(', ')}`
+      : `${id} returned to the graph`);
+  }
+
+  addPerson = () => {
+    const id = 'p' + (this.nextPid++);
+    this.commit(s => ({ people: [...s.people, { id, name: 'New teammate', cap: 20 }] }));
+    this.say('info', 'Teammate added — set their name and capacity');
+  };
+
+  removePerson(pid) {
+    this.commit(s => {
+      const people = s.people.filter(p => p.id !== pid);
+      const roots = Object.keys(s.assign).filter(k => s.assign[k].personId === pid);
+      const remove = new Set();
+      roots.forEach(id => {
+        UnassignRecalc.idsToReturn(id, this.TICKETS, s.assign).forEach(x => remove.add(x));
+      });
+      const kept = {};
+      Object.keys(s.assign).forEach(k => { if (!remove.has(k)) kept[k] = s.assign[k]; });
+      const assign = UnassignRecalc.repackAssign(
+        kept, people, this.TICKETS,
+        (t, pId, a, p) => this.plan(t, pId, a, p)
+      );
+      return { people, assign };
+    });
+    this.say('info', 'Teammate removed — their tickets went back to the graph');
+  }
+
+  initials(name) {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '—';
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
+
+  layout() {
+    const scale = this.props.nodeScale ?? 1;
+    const GAP_Y = 28, GAP_X = 18, LANE_GAP = 24, PAD = 28, TOP = 56;
+    const rects = {}; const columns = [];
+    let x = 0; let maxBottom = 0;
+
+    // Global depth from all deps (cross-epic included). Child rank is always > every parent.
+    const depth = {};
+    const visiting = {};
+    const depDepth = (id) => {
+      if (depth[id] != null) return depth[id];
+      if (visiting[id]) return 0;
+      const t = this.ticket(id);
+      if (!t) { depth[id] = 0; return 0; }
+      visiting[id] = true;
+      const parents = t.deps || [];
+      depth[id] = parents.length ? 1 + Math.max(0, ...parents.map(depDepth)) : 0;
+      delete visiting[id];
+      return depth[id];
+    };
+    this.TICKETS.forEach(t => depDepth(t.id));
+    // Enforce invariant across the whole graph (handles cycles / odd edges)
+    {
+      let guard = this.TICKETS.length * this.TICKETS.length + 1;
+      let changed = true;
+      while (changed && guard-- > 0) {
+        changed = false;
+        this.TICKETS.forEach(t => {
+          (t.deps || []).forEach(p => {
+            if (depth[p] == null) return;
+            const need = depth[p] + 1;
+            if ((depth[t.id] || 0) < need) {
+              depth[t.id] = need;
+              changed = true;
+            }
+          });
+        });
+      }
+    }
+
+    const sideOf = (t) => 52 * Math.sqrt(t.pts == null ? 1 : t.pts) * scale;
+    const maxD = this.TICKETS.reduce((m, t) => Math.max(m, depth[t.id] || 0), 0);
+    const rowH = [];
+    const nominal = 52 * scale;
+    for (let d = 0; d <= maxD; d++) {
+      let h = 0;
+      this.TICKETS.forEach(t => {
+        if (depth[t.id] === d) h = Math.max(h, sideOf(t));
+      });
+      rowH[d] = h;
+    }
+    // Distinct vertical band per depth so parent/child never share a row across epics
+    const yAt = [];
+    let bandY = TOP;
+    for (let d = 0; d <= maxD; d++) {
+      yAt[d] = bandY;
+      bandY += (rowH[d] || nominal) + GAP_Y;
+    }
+
+    const epicCols = (typeof GraphEpicOrder !== 'undefined' && GraphEpicOrder.orderEpicColumns)
+      ? GraphEpicOrder.orderEpicColumns(this.EPICS, this.TICKETS)
+      : this.EPICS;
+    epicCols.forEach((ep) => {
+      const list = this.TICKETS
+        .map((t, i) => ({ t, i }))
+        .filter(({ t }) => t.epic === ep.id)
+        .map(({ t, i }) => ({ t, i, side: sideOf(t) }));
+      const ids = new Set(list.map(l => l.t.id));
+      const byId = Object.fromEntries(list.map(l => [l.t.id, l]));
+
+      const adj = {};
+      ids.forEach(id => { adj[id] = []; });
+      list.forEach(({ t }) => {
+        (t.deps || []).forEach(d => {
+          if (!ids.has(d)) return;
+          adj[t.id].push(d);
+          adj[d].push(t.id);
+        });
+      });
+
+      const seen = {};
+      const components = [];
+      list.forEach(({ t }) => {
+        if (seen[t.id]) return;
+        const stack = [t.id]; const comp = [];
+        seen[t.id] = true;
+        while (stack.length) {
+          const id = stack.pop();
+          comp.push(id);
+          (adj[id] || []).forEach(n => {
+            if (!seen[n]) { seen[n] = true; stack.push(n); }
+          });
+        }
+        comp.sort((a, b) => (byId[a].i - byId[b].i) || (a < b ? -1 : a > b ? 1 : 0));
+        components.push(comp);
+      });
+      // Lanes with cross-epic deps sit left (nearer upstream epics), e.g. CHK-104 → PAY
+      const hasCrossEpic = (comp) => comp.some(id =>
+        ((byId[id].t.deps || []).some(d => !ids.has(d))));
+      components.sort((a, b) => {
+        const c = (hasCrossEpic(a) ? 0 : 1) - (hasCrossEpic(b) ? 0 : 1);
+        return c || (byId[a[0]].i - byId[b[0]].i) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+      });
+
+      const parents = {};
+      const children = {};
+      ids.forEach(id => { parents[id] = []; children[id] = []; });
+      list.forEach(({ t }) => {
+        (t.deps || []).forEach(d => {
+          if (!ids.has(d)) return;
+          parents[t.id].push(d);
+          children[d].push(t.id);
+        });
+      });
+
+      let laneX = x + PAD / 2;
+      let epicBottom = TOP;
+      let epicRight = x;
+      components.forEach((comp) => {
+        const byDepth = {};
+        comp.forEach(id => {
+          const d = depth[id];
+          (byDepth[d] || (byDepth[d] = [])).push(id);
+        });
+        const depths = Object.keys(byDepth).map(Number).sort((a, b) => a - b);
+        depths.forEach(d => {
+          byDepth[d].sort((a, b) => (byId[a].i - byId[b].i) || (a < b ? -1 : a > b ? 1 : 0));
+        });
+        if (typeof GraphRowOrder !== 'undefined' && GraphRowOrder.orderDepthRowsByBarycenter) {
+          GraphRowOrder.orderDepthRowsByBarycenter(byDepth, parents, children, 4);
+        }
+
+        let laneW = 0;
+        depths.forEach(d => {
+          const row = byDepth[d];
+          const w = row.reduce((s, id) => s + byId[id].side, 0) + GAP_X * Math.max(0, row.length - 1);
+          laneW = Math.max(laneW, w);
+        });
+        laneW += PAD;
+
+        depths.forEach(d => {
+          const row = byDepth[d];
+          const rowW = row.reduce((s, id) => s + byId[id].side, 0) + GAP_X * Math.max(0, row.length - 1);
+          let cx = laneX + (laneW - rowW) / 2;
+          const y = yAt[d];
+          row.forEach(id => {
+            const side = byId[id].side;
+            rects[id] = { x: cx, y, w: side, h: side, hue: ep.hue };
+            cx += side + GAP_X;
+            epicBottom = Math.max(epicBottom, y + side + GAP_Y);
+          });
+        });
+
+        epicRight = laneX + laneW;
+        laneX += laneW + LANE_GAP;
+      });
+
+      const minW = (list.length ? Math.max(...list.map(l => l.side)) : 0) + 56;
+      const colW = Math.max(epicRight - x + PAD / 2, minW);
+      columns.push({ id: ep.id, name: ep.name, x, w: colW, ink: `oklch(0.46 0.11 ${ep.hue})` });
+      maxBottom = Math.max(maxBottom, epicBottom);
+      x += colW;
+    });
+
+    // Geometric guarantee: every child is strictly below every parent (cross-epic)
+    {
+      let guard = this.TICKETS.length * this.TICKETS.length + 1;
+      let changed = true;
+      while (changed && guard-- > 0) {
+        changed = false;
+        this.TICKETS.forEach(t => {
+          const B = rects[t.id];
+          if (!B) return;
+          (t.deps || []).forEach(p => {
+            const A = rects[p];
+            if (!A) return;
+            const minY = A.y + A.h + GAP_Y;
+            if (B.y < minY) {
+              B.y = minY;
+              changed = true;
+              maxBottom = Math.max(maxBottom, B.y + B.h + GAP_Y);
+            }
+          });
+        });
+      }
+    }
+
+    return { rects, columns, graphW: x, graphH: maxBottom + 10 };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const sprint = this.sprintDays();
+    let { rects, columns, graphW, graphH } = this.layout();
+    if (s.graphFullscreen) {
+      const el = typeof document !== 'undefined' ? document.getElementById('graph-scroll') : null;
+      const padX = 44; // matches padding: 0 22px on the scroll container
+      const availW = el ? Math.max(0, el.clientWidth - padX) : 0;
+      if (availW > graphW) {
+        const scaleX = availW / graphW;
+        const next = {};
+        Object.keys(rects).forEach(id => {
+          const r = rects[id];
+          next[id] = Object.assign({}, r, { x: r.x * scaleX });
+        });
+        rects = next;
+        columns = columns.map(c => Object.assign({}, c, { x: c.x * scaleX, w: c.w * scaleX }));
+        graphW = availW;
+      }
+    }
+    const hover = s.hover;
+
+    // violations recomputed live
+    const violation = {};
+    Object.keys(s.assign).forEach(id => {
+      const a = s.assign[id];
+      const bad = this.ticket(id).deps.filter(d => {
+        const da = s.assign[d];
+        return !da || da.start + da.days > a.start + 1e-9;
+      });
+      if (bad.length) violation[id] = `Overlaps or precedes ${bad.join(', ')}`;
+    });
+
+    const nodes = this.TICKETS.map(t => {
+      const r = rects[t.id];
+      if (!r) return null;
+      const a = s.assign[t.id];
+      const ready = !a && t.deps.every(d => s.assign[d]);
+      const sz = this.SIZES[t.pts] || { t: '?', d: t.pts };
+      const person = a ? s.people.find(p => p.id === a.personId) : null;
+      const lit = hover === t.id || (hover && this.ticket(hover) && (this.ticket(hover).deps.includes(t.id) || t.deps.includes(hover)));
+      const pending = s.graphEdit && s.pendingParent === t.id;
+      const keys = Object.keys(this.SIZES).map(k => +k).filter(n => !isNaN(n)).sort((x, y) => x - y);
+      const atMin = keys.length && +t.pts === keys[0];
+      const atMax = keys.length && +t.pts === keys[keys.length - 1];
+      const editing = !!s.graphEdit;
+      return {
+        id: t.id, title: t.title, tshirt: sz.t,
+        meta: r.w >= 70 ? `${t.pts} pt${t.pts > 1 ? 's' : ''} · ${sz.d}d` : `${t.pts}p`,
+        ptsLabel: `${t.pts} pts`,
+        pad: r.w >= 70 ? '9px 10px' : '6px 7px',
+        x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h),
+        z: pending ? 3 : 1,
+        overflow: editing ? 'visible' : 'hidden',
+        showTitle: true,
+        showChip: r.w >= 70,
+        showSteppers: editing,
+        showMeta: !editing,
+        keyFont: r.w >= 70 ? 10 : 8.5,
+        draggable: !a && !s.graphFullscreen && !editing,
+        cursor: editing ? 'pointer' : (a ? 'pointer' : (s.graphFullscreen ? 'default' : 'grab')),
+        tip: editing
+          ? (pending ? `${t.id} selected · click a child` : `${t.title} · click to link · −/+ to resize`)
+          : (a ? `${t.title} — assigned to ${person ? person.name : ''} · click the bar to unassign` : `${t.title} · ${t.pts} pts (${sz.t}, ${sz.d} days)${t.deps.length ? ' · needs ' + t.deps.join(', ') : ''}`),
+        bg: a ? 'transparent' : `oklch(0.975 0.022 ${r.hue})`,
+        border: pending
+          ? '2px solid #2A2721'
+          : a
+            ? `1px dashed oklch(0.84 0.04 ${r.hue})`
+            : ready
+              ? `1.5px solid oklch(0.72 0.12 ${r.hue})`
+              : `1px solid oklch(0.88 0.06 ${r.hue})`,
+        shadow: a
+          ? 'none'
+          : ready
+            ? (lit
+              ? `0 0 0 2px oklch(0.78 0.1 ${r.hue} / .4), 0 0 16px oklch(0.65 0.12 ${r.hue} / .5), 0 10px 22px oklch(0.6 0.09 ${r.hue} / .22)`
+              : `0 0 0 2px oklch(0.78 0.1 ${r.hue} / .35), 0 0 14px oklch(0.65 0.12 ${r.hue} / .45)`)
+            : (lit ? `0 10px 22px oklch(0.6 0.09 ${r.hue} / .22)` : '0 1px 2px rgba(40,34,22,.06)'),
+        opacity: a ? 0.5 : 1,
+        transform: lit && !a && !editing ? 'translateY(-3px) scale(1.03)' : 'none',
+        ink: `oklch(0.46 0.11 ${r.hue})`,
+        chipBg: `oklch(0.93 0.05 ${r.hue})`,
+        owner: person ? this.initials(person.name) : null,
+        ownerBg: person ? this.AVATARS[s.people.indexOf(person) % this.AVATARS.length] : '',
+        stepDownColor: atMin ? '#BDB6A9' : '#514C43',
+        stepUpColor: atMax ? '#BDB6A9' : '#514C43',
+        stepDownCursor: atMin ? 'default' : 'pointer',
+        stepUpCursor: atMax ? 'default' : 'pointer',
+        onDragStart: (e) => { if (a || editing) { e.preventDefault(); return; } e.dataTransfer.effectAllowed = 'move'; this.setState({ dragId: t.id }); },
+        onDragEnd: () => this.setState({ dragId: null, overRow: null }),
+        onEnter: () => this.setState({ hover: t.id }),
+        onLeave: () => this.setState(st => (st.hover === t.id ? { hover: null } : null)),
+        onClick: (e) => {
+          if (e) e.stopPropagation();
+          if (editing) { this.onGraphTicketClick(t.id); return; }
+          if (a) this.unassign(t.id);
+        },
+        onStepDown: (e) => { if (e) { e.stopPropagation(); e.preventDefault(); } this.stepEstimate(t.id, -1); },
+        onStepUp: (e) => { if (e) { e.stopPropagation(); e.preventDefault(); } this.stepEstimate(t.id, 1); }
+      };
+    }).filter(Boolean);
+
+    const edges = [];
+    this.TICKETS.forEach(t => t.deps.forEach(d => {
+      const A = rects[d], B = rects[t.id];
+      if (!A || !B) return;
+      const acx = A.x + A.w / 2, acy = A.y + A.h / 2, bcx = B.x + B.w / 2, bcy = B.y + B.h / 2;
+      const dx = bcx - acx, dy = bcy - acy;
+      let f, tt, c1, c2;
+      if (Math.abs(dx) > Math.abs(dy) * 0.85) {
+        const dir = dx > 0 ? 1 : -1;
+        f = { x: dir > 0 ? A.x + A.w : A.x, y: acy };
+        tt = { x: dir > 0 ? B.x : B.x + B.w, y: bcy };
+        const hx = Math.min(58, Math.abs(tt.x - f.x) * 0.45);
+        c1 = { x: f.x + dir * hx, y: f.y }; c2 = { x: tt.x - dir * hx, y: tt.y };
+      } else {
+        const dir = dy > 0 ? 1 : -1;
+        f = { x: acx, y: dir > 0 ? A.y + A.h : A.y };
+        tt = { x: bcx, y: dir > 0 ? B.y : B.y + B.h };
+        const hy = Math.min(46, Math.abs(tt.y - f.y) * 0.45);
+        c1 = { x: f.x, y: f.y + dir * hy }; c2 = { x: tt.x, y: tt.y - dir * hy };
+      }
+      const lit = hover === t.id || hover === d;
+      const parentId = d, childId = t.id;
+      edges.push({
+        d: `M${f.x.toFixed(1)},${f.y.toFixed(1)} C${c1.x.toFixed(1)},${c1.y.toFixed(1)} ${c2.x.toFixed(1)},${c2.y.toFixed(1)} ${tt.x.toFixed(1)},${tt.y.toFixed(1)}`,
+        arrow: GraphEdgeArrow.arrowHeadOnCubic(f, c1, c2, tt, lit ? 16 : 13).points,
+        stroke: lit ? `oklch(0.58 0.12 ${B.hue})` : '#DED8CC',
+        sw: lit ? 2 : 1.3,
+        dash: s.assign[d] ? '5 6' : '0',
+        hitEvents: s.graphEdit ? 'stroke' : 'none',
+        cursor: s.graphEdit ? 'pointer' : 'default',
+        onClick: (e) => this.onEdgeClick(parentId, childId, e)
+      });
+    }));
+
+    const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const nVisible = s.multiSprint
+      ? SprintHorizon.visibleSprintCount(s.assign, sprint, SprintHorizon.MAX_SPRINTS)
+      : 1;
+    const totalDays = sprint * nVisible;
+    const dayPx = s.ganttDayPx || 58;
+    const dates = this.sprintDates(totalDays);
+    const days = dates.map((d, i) => ({
+      dow: DOW[d.getDay()],
+      date: d.getDate(),
+      line: (i > 0 && i % sprint === 0) ? '#D8D2C6' : (d.getDay() === 1 && i > 0 ? '#E4DFD5' : '#F4F0E9')
+    }));
+    const stamp = (d) => d ? `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}` : '';
+    const shortStamp = (d) => d ? `${d.getDate()} ${MON[d.getMonth()]}` : '';
+    const sprintSub = nVisible > 1
+      ? `${stamp(dates[0])} – ${stamp(dates[dates.length - 1])} · ${nVisible} sprints · ${totalDays} working days · ${s.source}`
+      : `${stamp(dates[0])} – ${stamp(dates[dates.length - 1])} · ${sprint} working days · ${s.source}`;
+    const bands = [];
+    for (let i = 0; i < nVisible; i++) {
+      const a = dates[i * sprint];
+      const b = dates[i * sprint + sprint - 1];
+      bands.push({
+        label: `Sprint ${i + 1} · ${shortStamp(a)}–${shortStamp(b)}`,
+        flex: `1 0 ${sprint * dayPx}px`,
+        minW: `${sprint * dayPx}px`,
+        bg: i % 2 ? '#F4F0E9' : '#FAF7F1'
+      });
+    }
+
+    const dragT = s.dragId ? this.ticket(s.dragId) : null;
+
+    const rows = s.people.map((p, pi) => {
+      const used = this.usedBy(p.id, s.assign);
+      const den = p.cap * nVisible;
+      const over = used > den;
+      const pct = den > 0 ? Math.min(100, (used / den) * 100) : (used > 0 ? 100 : 0);
+      const bars = Object.keys(s.assign).filter(k => s.assign[k].personId === p.id).map(k => {
+        const a = s.assign[k]; const t = this.ticket(k);
+        const hue = (this.epic(t.epic) || { hue: 40 }).hue;
+        const wpc = (a.days / totalDays) * 100;
+        const lit = hover === k;
+        const si = SprintHorizon.sprintIndex(a.start, sprint);
+        const dayIn = a.start - si * sprint + 1;
+        const dayEnd = a.start + a.days - si * sprint;
+        const where = si > 0 ? `sprint ${si + 1} day ${dayIn.toFixed(dayIn % 1 ? 1 : 0)}–${dayEnd.toFixed(dayEnd % 1 ? 1 : 0)}` : `day ${dayIn.toFixed(dayIn % 1 ? 1 : 0)}–${(a.start + a.days).toFixed((a.start + a.days) % 1 ? 1 : 0)}`;
+        return {
+          id: k, title: t.title,
+          left: (a.start / totalDays) * 100, width: wpc,
+          showLabel: wpc > 6.5, showTitle: true,
+          bg: `oklch(0.93 0.055 ${hue})`,
+          border: `1px solid oklch(0.84 0.08 ${hue})`,
+          ink: `oklch(0.4 0.11 ${hue})`,
+          shadow: lit ? `0 8px 18px oklch(0.6 0.09 ${hue} / .3)` : '0 1px 2px rgba(40,34,22,.07)',
+          transform: lit ? 'translateY(-2px)' : 'none',
+          warn: violation[k] || null,
+          tip: `${t.id} · ${t.title} — ${t.pts} pts, ${a.days}d, ${where}. Click to unassign.${violation[k] ? ' ⚠ ' + violation[k] : ''}`,
+          onClick: () => this.unassign(k),
+          onEnter: () => this.setState({ hover: k }),
+          onLeave: () => this.setState(st => (st.hover === k ? { hover: null } : null))
+        };
+      });
+
+      let preview = null, blocked = null;
+      if (dragT && s.overRow === p.id && !s.assign[dragT.id]) {
+        const r = this.plan(dragT, p.id, s.assign, s.people);
+        if (r.error) blocked = r.hint + ' · ' + dragT.id;
+        else {
+          const hue = (this.epic(dragT.epic) || { hue: 40 }).hue;
+          const psi = SprintHorizon.sprintIndex(r.start, sprint);
+          const pday = r.start - psi * sprint + 1;
+          preview = {
+            left: (r.start / totalDays) * 100, width: (r.days / totalDays) * 100,
+            bg: `oklch(0.97 0.03 ${hue} / .85)`,
+            border: `1.5px dashed oklch(0.7 0.1 ${hue})`,
+            ink: `oklch(0.45 0.11 ${hue})`,
+            label: psi > 0 ? `s${psi + 1} d${pday.toFixed(pday % 1 ? 1 : 0)}` : `day ${pday.toFixed(pday % 1 ? 1 : 0)}`
+          };
+        }
+      }
+
+      return {
+        id: p.id, name: p.name, cap: p.cap, used, den, pct,
+        initials: this.initials(p.name),
+        avatarBg: this.AVATARS[pi % this.AVATARS.length],
+        capColor: over ? 'oklch(0.6 0.16 27)' : pct > 85 ? 'oklch(0.72 0.14 75)' : 'oklch(0.66 0.11 155)',
+        capInk: over ? 'oklch(0.5 0.16 27)' : '#514C43',
+        rowBg: s.overRow === p.id ? (blocked ? 'oklch(0.985 0.012 27)' : 'oklch(0.985 0.012 155)') : '#FFFFFF',
+        anim: s.shake === p.id ? 'shakeRow .5s ease both' : 'none',
+        bars, preview, blocked,
+        onName: (e) => { const v = e.target.value; this.commit(st => ({ people: st.people.map(x => x.id === p.id ? Object.assign({}, x, { name: v }) : x) })); },
+        onCap: (e) => {
+          const parsed = parseInt(e.target.value || '0', 10);
+          const v = isNaN(parsed) ? 0 : Math.max(0, parsed);
+          this.commit(st => ({ people: st.people.map(x => x.id === p.id ? Object.assign({}, x, { cap: v }) : x) }));
+        },
+        onRemove: () => this.removePerson(p.id),
+        onDragOver: (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (s.overRow !== p.id) this.setState({ overRow: p.id }); },
+        onDragLeave: (e) => { if (e.currentTarget.contains(e.relatedTarget)) return; this.setState(st => (st.overRow === p.id ? { overRow: null } : null)); },
+        onDrop: (e) => { e.preventDefault(); this.drop(p.id); }
+      };
+    });
+
+    const totalPts = this.TICKETS.reduce((a, t) => a + t.pts, 0);
+    const plannedPts = Object.keys(s.assign).reduce((a, k) => a + this.ticket(k).pts, 0);
+    const teamCap = s.people.reduce((a, p) => a + p.cap * nVisible, 0);
+    const fillPct = teamCap ? Math.min(100, (plannedPts / teamCap) * 100) : 0;
+    const multiOn = !!s.multiSprint;
+
+    const T = s.toast;
+    const tone = {
+      error: { bg: 'oklch(0.97 0.028 27)', border: '1px solid oklch(0.86 0.08 27)', ink: 'oklch(0.45 0.16 27)', icon: '!' },
+      warn: { bg: 'oklch(0.975 0.03 75)', border: '1px solid oklch(0.87 0.08 75)', ink: 'oklch(0.45 0.13 75)', icon: '!' },
+      ok: { bg: 'oklch(0.975 0.028 155)', border: '1px solid oklch(0.86 0.07 155)', ink: 'oklch(0.42 0.12 155)', icon: '✓' },
+      info: { bg: '#FFFFFF', border: '1px solid #E4DFD5', ink: '#514C43', icon: '·' }
+    };
+
+    return {
+      columns, nodes, edges, graphW, graphH, days, rows, bands,
+      rowH: 62, barTop: 11, barH: 40,
+      dayPx, ganttMinW: 232 + totalDays * dayPx,
+      plannedPts, totalPts, usedPts: plannedPts, teamCap,
+      fillPct, fillColor: fillPct > 100 ? 'oklch(0.6 0.16 27)' : 'oklch(0.66 0.11 155)',
+      unassignedCount: this.TICKETS.length - Object.keys(s.assign).length,
+      sprintName: this.SPRINT.name, sprintSub,
+      undo: this.undo, redo: this.redo, clearAll: this.clearAll, addPerson: this.addPerson,
+      savePlan: this.savePlan, loadPlan: this.loadPlan, downloadTickets: this.downloadTickets, savedNote: s.savedAt ? 'Saved ' + s.savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
+      undoColor: s.past.length ? '#1B1A17' : '#BDB6A9',
+      redoColor: s.future.length ? '#1B1A17' : '#BDB6A9',
+      toast: T ? Object.assign({ msg: T.msg }, tone[T.kind] || tone.info) : null,
+      graphFullscreen: !!s.graphFullscreen,
+      showGantt: !s.graphFullscreen,
+      showSplitBar: !s.graphFullscreen,
+      toggleGraphFullscreen: this.toggleGraphFullscreen,
+      toggleGraphEdit: this.toggleGraphEdit,
+      onGraphBgClick: this.onGraphBgClick,
+      graphHint: s.graphEdit
+        ? (s.pendingParent ? `${s.pendingParent} selected · click a child` : 'click a parent, then a child · −/+ to resize')
+        : `${this.TICKETS.length - Object.keys(s.assign).length} tickets left · drag one onto a teammate`,
+      editTitle: s.graphEdit ? 'Exit edit mode' : 'Edit estimates and dependencies',
+      editBorder: s.graphEdit ? '#2A2721' : '#E4DFD5',
+      editBg: s.graphEdit ? '#2A2721' : '#FFF',
+      editHover: s.graphEdit ? '#413C33' : '#F7F4EE',
+      editInk: s.graphEdit ? '#FBFAF8' : '#514C43',
+      editKnobTrack: s.graphEdit ? '#FBFAF8' : '#E4DFD5',
+      editKnob: s.graphEdit ? '#2A2721' : '#FFFFFF',
+      editKnobLeft: s.graphEdit ? '11px' : '1px',
+      onSplitPointerDown: this.onSplitPointerDown,
+      graphFsTitle: s.graphFullscreen ? 'Exit fullscreen' : 'Expand graph',
+      graphFsIcon: s.graphFullscreen ? '✕' : '⛶',
+      graphSectionFlex: s.graphFullscreen ? '1 1 auto' : `0 0 ${s.graphWidthPx || 640}px`,
+      graphSectionBorder: 'none',
+      graphMinW: s.graphFullscreen ? '0' : '0',
+      splitBarBg: s.resizingSplit ? '#B5AEA1' : '#EBE7DF',
+      splitGripBg: s.resizingSplit ? '#8A857B' : '#D8D2C6',
+      toggleMultiSprint: this.toggleMultiSprint,
+      zoomIn: this.zoomIn, zoomOut: this.zoomOut,
+      showZoom: multiOn && nVisible > 1,
+      showBands: nVisible > 1,
+      zoomOutColor: dayPx <= 28 ? '#BDB6A9' : '#514C43',
+      zoomInColor: dayPx >= 96 ? '#BDB6A9' : '#514C43',
+      multiTitle: multiOn ? 'Turn off multi-sprint' : 'Plan across up to 7 sprints',
+      multiBorder: multiOn ? '#2A2721' : '#E4DFD5',
+      multiBg: multiOn ? '#2A2721' : '#FFF',
+      multiHover: multiOn ? '#413C33' : '#F7F4EE',
+      multiInk: multiOn ? '#FBFAF8' : '#514C43',
+      multiKnobTrack: multiOn ? '#FBFAF8' : '#E4DFD5',
+      multiKnob: multiOn ? '#2A2721' : '#FFFFFF',
+      multiKnobLeft: multiOn ? '11px' : '1px'
+    };
+  }
+}
+</script>
+</body>
+</html>

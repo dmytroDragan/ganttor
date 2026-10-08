@@ -1,0 +1,39 @@
+{
+  "sprint": {
+    "name": "Sprint 24 — Checkout Revamp",
+    "start": "2026-08-10",
+    "days": 10
+  },
+  "sizes": {
+    "1": { "tshirt": "XS", "days": 1 },
+    "2": { "tshirt": "S", "days": 2 },
+    "3": { "tshirt": "M", "days": 3 },
+    "5": { "tshirt": "M", "days": 5 },
+    "8": { "tshirt": "L", "days": 8 }
+  },
+  "epics": [
+    { "id": "CHK", "name": "Checkout Flow Rebuild", "hue": 255 },
+    { "id": "PAY", "name": "Payments Service", "hue": 155 },
+    { "id": "ORD", "name": "Order Confirmation", "hue": 65 }
+  ],
+  "tickets": [
+    { "id": "CHK-101", "epic": "CHK", "title": "Design token audit", "pts": 1, "deps": [] },
+    { "id": "CHK-102", "epic": "CHK", "title": "Cart summary component", "pts": 3, "deps": ["CHK-101"] },
+    { "id": "CHK-103", "epic": "CHK", "title": "Address form + validation", "pts": 5, "deps": ["CHK-101"] },
+    { "id": "CHK-104", "epic": "CHK", "title": "Payment step UI", "pts": 5, "deps": ["CHK-102", "PAY-201"] },
+    { "id": "CHK-105", "epic": "CHK", "title": "Review & place order", "pts": 3, "deps": ["CHK-103", "CHK-104"] },
+    { "id": "CHK-106", "epic": "CHK", "title": "Responsive pass", "pts": 2, "deps": ["CHK-105"] },
+    { "id": "PAY-201", "epic": "PAY", "title": "Tokenization contract", "pts": 2, "deps": [] },
+    { "id": "PAY-202", "epic": "PAY", "title": "Card vault integration", "pts": 8, "deps": ["PAY-201"] },
+    { "id": "PAY-205", "epic": "PAY", "title": "Idempotency keys", "pts": 2, "deps": ["PAY-201"] },
+    { "id": "PAY-203", "epic": "PAY", "title": "3-D Secure challenge", "pts": 5, "deps": ["PAY-202"] },
+    { "id": "PAY-204", "epic": "PAY", "title": "Refund endpoint", "pts": 3, "deps": ["PAY-202"] },
+    { "id": "PAY-206", "epic": "PAY", "title": "Failure retry policy", "pts": 3, "deps": ["PAY-203", "PAY-205"] },
+    { "id": "ORD-301", "epic": "ORD", "title": "Order event schema", "pts": 1, "deps": [] },
+    { "id": "ORD-302", "epic": "ORD", "title": "Confirmation email", "pts": 2, "deps": ["ORD-301"] },
+    { "id": "ORD-303", "epic": "ORD", "title": "Receipt PDF service", "pts": 5, "deps": ["ORD-301", "PAY-204"] },
+    { "id": "ORD-304", "epic": "ORD", "title": "Order status webhook", "pts": 3, "deps": ["ORD-301", "PAY-206"] },
+    { "id": "ORD-305", "epic": "ORD", "title": "Post-purchase upsell", "pts": 2, "deps": ["CHK-105"] },
+    { "id": "ORD-306", "epic": "ORD", "title": "E2E happy-path suite", "pts": 8, "deps": ["CHK-106", "ORD-304"] }
+  ]
+}

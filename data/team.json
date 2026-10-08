@@ -1,0 +1,8 @@
+{
+  "team": [
+    { "id": "p1", "name": "Maya Okonkwo", "role": "Frontend", "capacity": 21 },
+    { "id": "p2", "name": "Liam Petrov", "role": "Backend", "capacity": 26 },
+    { "id": "p3", "name": "Sofia Reyes", "role": "Full stack", "capacity": 18 },
+    { "id": "p4", "name": "Dev Rao", "role": "QA", "capacity": 13 }
+  ]
+}
