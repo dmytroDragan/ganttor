@@ -1,14 +1,12 @@
-# ganttor
 
-<p align="center">
-  <img src="assets/logo.png" alt="ganttor logo" width="220">
-</p>
+## Gattor
 
-Most tools like Jira miss the link between dependencies and capacity — that is why **ganttor** exists.
+Most sprint planning tools miss the link between dependencies and capacity — that is why **ganttor** exists.
 
-Minimalistic Local sprint planner for dependency-aware scheduling: drag tickets from a graph onto teammates and see capacity fill on a Gantt board.
+Minimalistic Local sprint planner for dependency-aware scheduling: 
+Just drag tickets from a graph onto teammates and see capacity fill on a Gantt board.
 
-![ganttor: dependency graph and team Gantt schedule](assets/demo.png)
+![ganttor: dependency graph and team Gantt schedule](demo.png)
 
 ## Main capabilities
 
@@ -45,37 +43,27 @@ Any static server works (`npx serve .`, etc.).
 
 ### Quick planning loop
 
-1. Edit `data/tickets.json` and `data/team.json` for your sprint backlog and roster (a fictional checkout sample ships with the repo).
-2. Reload the page — data is fetched on startup; optional `data/sprint-plan.json` is applied if present.
+1. Edit `tickets.json` and `team.json` for your sprint backlog and roster (a fictional checkout sample ships with the repo).
+2. Reload the page — data is fetched on startup; optional `sprint-plan.json` is applied if present.
 3. Drag ready tickets onto teammates; click a Gantt bar (or assigned graph node, when Edit is off) to unassign.
 4. Turn on **Edit** to change estimates or dependencies; the graph rebounds and the sprint plan refreshes after each change.
 5. **Save plan** to download `sprint-plan.json`, **Download tickets** to keep backlog edits, or **Load plan** to restore a schedule.
-
-## Layout
-
-| Path | Role |
-|------|------|
-| `index.html`, `support.js` | App entry and Design Component runtime |
-| `src/` | Logic modules (graph layout/edit, sprint horizon, unassign/repack) |
-| `test/` | Node tests for those modules |
-| `data/` | `tickets.json`, `team.json`, optional `sprint-plan.json` |
-| `assets/` | Images (`logo.png`, `demo.png`) |
 
 ## Data files
 
 | File | Role |
 |------|------|
-| `data/tickets.json` | Sprint metadata, epic colors, story-point → days sizes, ticket list (`id`, `epic`, `title`, `pts`, `deps`) |
-| `data/team.json` | People (`id`, `name`, `role`, `capacity`) |
-| `data/sprint-plan.json` | Optional saved schedule (`gantt`, `capacityPlan`, totals) |
+| `tickets.json` | Sprint metadata, epic colors, story-point → days sizes, ticket list (`id`, `epic`, `title`, `pts`, `deps`) |
+| `team.json` | People (`id`, `name`, `role`, `capacity`) |
+| `sprint-plan.json` | Optional saved schedule (`gantt`, `capacityPlan`, totals) |
 
-**Download tickets** builds the same shape as `tickets.json` from the current session (including edited `pts` / `deps`) and triggers a browser download. Reload still reads `./data/tickets.json` from disk — drop the download into `data/` when you want edits to stick. The plan file only stores who/when.
+**Download tickets** builds the same shape as `tickets.json` from the current session (including edited `pts` / `deps`) and triggers a browser download. Reload still reads `./tickets.json` from disk — drop the download in the project root when you want edits to stick. The plan file only stores who/when.
 
-If `data/tickets.json` / `data/team.json` cannot be read, the app falls back to built-in sample data.
+If `tickets.json` / `team.json` cannot be read, the app falls back to built-in sample data.
 
 ## Sprint plan save / load
 
-**Save plan** does not write into the project folder. It builds a JSON snapshot of the current board and triggers a browser download named `sprint-plan.json`. To have the app auto-load that plan next time, put the downloaded file in `data/` and reload.
+**Save plan** does not write into the project folder. It builds a JSON snapshot of the current board and triggers a browser download named `sprint-plan.json`. To have the app auto-load that plan next time, put the downloaded file in the project root (same directory as the HTML) and reload.
 
 ### What gets written
 
@@ -91,17 +79,17 @@ Each `gantt` entry includes ticket metadata (`ticket`, `epic`, `title`, `points`
 
 ### How load uses that file
 
-- **On startup:** if `./data/sprint-plan.json` is present and readable, it is applied after `tickets.json` / `team.json`.
+- **On startup:** if `./sprint-plan.json` is present and readable, it is applied after `tickets.json` / `team.json`.
 - **Load plan button:** pick any saved JSON file from disk.
 
 Apply rules:
 
 1. People come from `capacityPlan` when present (id, name, capacity); otherwise the current team stays.
 2. Each `gantt` row is matched to a ticket (by id) and a person (by `assigneeId`, else name). Unmatched rows are skipped.
-3. Start day is taken from `startDay` (converted to 0-based) or `start`. **Duration is always recomputed** from the ticket’s current story points → days map — saved `durationDays` is ignored so size changes in `data/tickets.json` win.
+3. Start day is taken from `startDay` (converted to 0-based) or `start`. **Duration is always recomputed** from the ticket’s current story points → days map — saved `durationDays` is ignored so size changes in `tickets.json` win.
 4. Assignments are then **repacked** (same planner used when dragging) so capacity gaps and dependency order stay consistent. `sprint.multiSprint` turns the Multi-sprint toggle on before packing; if it is off, tickets whose start is past sprint 1 are dropped.
 
-`data/tickets.json` remains the source of truth for the backlog; the plan file only stores who/when.
+`tickets.json` remains the source of truth for the backlog; the plan file only stores who/when.
 
 ## Tests
 
@@ -114,7 +102,7 @@ npm test
 Or:
 
 ```bash
-node --test test/unassign-recalc.test.js test/graph-row-order.test.js test/graph-epic-order.test.js test/sprint-horizon.test.js test/graph-edit.test.js test/graph-edge-arrow.test.js
+node --test unassign-recalc.test.js graph-row-order.test.js graph-epic-order.test.js sprint-horizon.test.js graph-edit.test.js graph-edge-arrow.test.js
 ```
 
 ## License
