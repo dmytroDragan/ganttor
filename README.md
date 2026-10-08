@@ -6,7 +6,7 @@ Most sprint planning tools miss the link between dependencies and capacity — t
 Minimalistic Local sprint planner for dependency-aware scheduling: 
 Just drag tickets from a graph onto teammates and see capacity fill on a Gantt board.
 
-![ganttor: dependency graph and team Gantt schedule](demo.png)
+![ganttor: dependency graph and team Gantt schedule](assets/demo.png)
 
 ## Main capabilities
 
