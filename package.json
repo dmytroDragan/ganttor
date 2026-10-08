@@ -1,0 +1,11 @@
+{
+  "name": "ganttor",
+  "version": "0.1.2",
+  "private": true,
+  "description": "Local sprint planner with a dependency graph and team Gantt board",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test test/unassign-recalc.test.js test/graph-row-order.test.js test/graph-epic-order.test.js test/sprint-horizon.test.js test/graph-edit.test.js test/graph-edge-arrow.test.js",
+    "start": "python3 -m http.server 8000"
+  }
+}
