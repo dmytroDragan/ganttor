@@ -52,6 +52,84 @@
     return false;
   }
 
+  function cycleKey(path) {
+    const n = path.length - 1;
+    let best = null;
+    for (let i = 0; i < n; i++) {
+      const parts = [];
+      for (let j = 0; j < n; j++) parts.push(path[(i + j) % n]);
+      const k = parts.join('\0');
+      if (best == null || k < best) best = k;
+    }
+    return best;
+  }
+
+  function rotateCycle(path) {
+    const n = path.length - 1;
+    let bestI = 0;
+    let bestK = null;
+    for (let i = 0; i < n; i++) {
+      const parts = [];
+      for (let j = 0; j < n; j++) parts.push(path[(i + j) % n]);
+      const k = parts.join('\0');
+      if (bestK == null || k < bestK) {
+        bestK = k;
+        bestI = i;
+      }
+    }
+    const body = [];
+    for (let j = 0; j < n; j++) body.push(path[(bestI + j) % n]);
+    return body.concat([body[0]]);
+  }
+
+  /** Directed simple cycles following deps (ticket → prerequisite). */
+  function findCycles(tickets) {
+    const byId = {};
+    (tickets || []).forEach(t => { byId[t.id] = t; });
+    const ids = (tickets || []).map(t => t.id).filter(id => byId[id]);
+    const index = {};
+    ids.forEach((id, i) => { index[id] = i; });
+    const cycles = [];
+    const seen = {};
+
+    function dfs(start, u, path, inPath) {
+      const deps = (byId[u] && byId[u].deps) || [];
+      for (let i = 0; i < deps.length; i++) {
+        const v = deps[i];
+        if (!byId[v]) continue;
+        if (v === start) {
+          const cyc = path.concat([v]);
+          const k = cycleKey(cyc);
+          if (!seen[k]) {
+            seen[k] = true;
+            cycles.push(rotateCycle(cyc));
+          }
+          continue;
+        }
+        if (inPath[v]) continue;
+        if (index[v] < index[start]) continue;
+        inPath[v] = true;
+        path.push(v);
+        dfs(start, v, path, inPath);
+        path.pop();
+        inPath[v] = false;
+      }
+    }
+
+    for (let s = 0; s < ids.length; s++) {
+      const start = ids[s];
+      const inPath = {};
+      inPath[start] = true;
+      dfs(start, start, [start], inPath);
+    }
+    return cycles;
+  }
+
+  function formatCycles(cycles) {
+    if (!cycles || !cycles.length) return '';
+    return cycles.map(c => 'Cycle: ' + c.join(' → ')).join(' · ');
+  }
+
   function addDep(tickets, parentId, childId) {
     const copy = cloneTickets(tickets);
     if (parentId === childId) return { tickets: copy, error: 'self' };
@@ -128,7 +206,7 @@
   }
 
   const api = {
-    stepPts, wouldCycle, addDep, removeDep, setPts, cloneTickets, refreshAssign, exportTickets
+    stepPts, wouldCycle, findCycles, formatCycles, addDep, removeDep, setPts, cloneTickets, refreshAssign, exportTickets
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.GraphEdit = api;
