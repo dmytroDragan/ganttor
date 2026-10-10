@@ -168,4 +168,51 @@ function makePlan(ticketList, sprintDays, maxSprints, strict) {
   assert.deepStrictEqual(out.tickets[1].deps, ['A']);
 }
 
+{
+  assert.deepStrictEqual(G.findCycles(tickets()), [], 'acyclic');
+}
+
+{
+  const cyclic = [
+    { id: 'A', deps: ['B'] },
+    { id: 'B', deps: ['A'] }
+  ];
+  assert.deepStrictEqual(G.findCycles(cyclic), [['A', 'B', 'A']]);
+}
+
+{
+  const self = [{ id: 'A', deps: ['A'] }];
+  assert.deepStrictEqual(G.findCycles(self), [['A', 'A']]);
+}
+
+{
+  const two = [
+    { id: 'A', deps: ['B'] },
+    { id: 'B', deps: ['A'] },
+    { id: 'C', deps: ['D'] },
+    { id: 'D', deps: ['C'] }
+  ];
+  assert.deepStrictEqual(G.findCycles(two), [
+    ['A', 'B', 'A'],
+    ['C', 'D', 'C']
+  ]);
+}
+
+{
+  const long = [
+    { id: 'A', deps: ['B'] },
+    { id: 'B', deps: ['C'] },
+    { id: 'C', deps: ['A'] }
+  ];
+  assert.deepStrictEqual(G.findCycles(long), [['A', 'B', 'C', 'A']]);
+}
+
+{
+  assert.strictEqual(
+    G.formatCycles([['A', 'B', 'A'], ['C', 'D', 'C']]),
+    'Cycle: A → B → A · Cycle: C → D → C'
+  );
+  assert.strictEqual(G.formatCycles([]), '');
+}
+
 console.log('graph-edit.test.js: ok');
