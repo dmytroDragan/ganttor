@@ -11,6 +11,7 @@
 <script src="./src/graph-epic-order.js"></script>
 <script src="./src/graph-edge-arrow.js"></script>
 <script src="./src/sprint-horizon.js"></script>
+<script src="./src/auto-plan.js"></script>
 <script src="./src/feature-flags.js"></script>
 </head>
 <body>
@@ -42,6 +43,9 @@
     <div style="width:1px;align-self:stretch;background:#EBE7DF;flex:0 0 auto"></div>
     <div style="display:flex;flex-direction:column;gap:2px">
       <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em">{{ sprintName }}</div>
+      <sc-if value="{{ showPlanFile }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#514C43">Plan: {{ planFile }}</div>
+      </sc-if>
       <div style="font-size:11.5px;color:#8A857B">{{ sprintSub }}</div>
     </div>
 
@@ -81,6 +85,15 @@
       <button onClick="{{ redo }}" title="Redo (⇧⌘Z)" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:{{ redoColor }};cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">
         <span style="font-family:'JetBrains Mono',monospace;font-size:13px">↻</span> Redo
       </button>
+      <button onClick="{{ autoPlan }}" title="Schedule every remaining ticket onto the team (roles, capacity and deps respected). Existing assignments stay." style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:#514C43;cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px">▶</span> Auto-plan
+      </button>
+      <div title="Auto-plan: minimum finish-day gain (days) that justifies switching a teammate to another epic" style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:#8A857B">
+        gain ≥ <input type="number" min="0" step="0.5" value="{{ autoGain }}" onChange="{{ onAutoGain }}" style="width:42px;border:1px solid #E4DFD5;border-radius:6px;padding:3px 4px;background:#FFF;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#514C43;text-align:right"> d
+      </div>
+      <div title="Auto-plan: switch a teammate when their sprint load is more than this many points above the team average" style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:#8A857B">
+        skew > <input type="number" min="0" step="5" value="{{ autoSkew }}" onChange="{{ onAutoSkew }}" style="width:46px;border:1px solid #E4DFD5;border-radius:6px;padding:3px 4px;background:#FFF;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#514C43;text-align:right"> %
+      </div>
       <button onClick="{{ clearAll }}" style="padding:8px 13px;border-radius:9px;border:1px solid transparent;background:transparent;font-family:inherit;font-size:12.5px;font-weight:500;color:#8A857B;cursor:pointer;transition:background .15s" style-hover="background:#F4F0E9">Clear board</button>
       <sc-if value="{{ savedNote }}" hint-placeholder-val="{{ false }}">
         <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#A29C90;white-space:nowrap">{{ savedNote }}</span>
@@ -246,6 +259,9 @@
                 <input value="{{ r.name }}" onChange="{{ r.onName }}" spellcheck="false" style="flex:1 1 auto;min-width:0;border:1px solid transparent;border-radius:6px;padding:3px 5px;margin-left:-5px;background:transparent;font-size:12.5px;font-weight:600;color:#1B1A17;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE" style-focus="background:#FFF;border-color:#D8D2C6">
                 <button onClick="{{ r.onRemove }}" title="Remove" style="flex:0 0 auto;width:20px;height:20px;border:none;border-radius:6px;background:transparent;color:#C6BFB2;font-size:13px;line-height:1;cursor:pointer;transition:background .15s,color .15s" style-hover="background:#F4EDEA;color:oklch(0.55 0.17 27)">×</button>
               </div>
+              <sc-if value="{{ r.rolesLabel }}" hint-placeholder-val="{{ false }}">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8A857B;padding-left:30px;margin-top:-2px">{{ r.rolesLabel }}</div>
+              </sc-if>
               <div style="display:flex;align-items:center;gap:8px">
                 <div style="position:relative;flex:1 1 auto;height:6px;border-radius:99px;background:#F0ECE4;overflow:hidden">
                   <div style="position:absolute;left:0;top:0;bottom:0;border-radius:99px;transition:width .45s cubic-bezier(.2,.9,.3,1),background .25s;width:{{ r.pct }}%;background:{{ r.capColor }}"></div>
@@ -263,6 +279,10 @@
                   <div style="flex:1 0 {{ dayPx }}px;min-width:{{ dayPx }}px;border-left:1px solid {{ d.line }}"></div>
                 </sc-for>
               </div>
+
+              <sc-for list="{{ r.blockWashes }}" as="w" hint-placeholder-count="0">
+                <div title="Blocked" style="position:absolute;top:0;bottom:0;left:{{ w.left }}%;width:{{ w.width }}%;background:#E8E4DC;pointer-events:none"></div>
+              </sc-for>
 
               <sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="0">
                 <div onClick="{{ b.onClick }}" onMouseEnter="{{ b.onEnter }}" onMouseLeave="{{ b.onLeave }}" title="{{ b.tip }}"
@@ -334,43 +354,44 @@ class Component extends DCLogic {
 
   TICKETS = [
     { id: 'CHK-101', epic: 'CHK', title: 'Design token audit', pts: 1, deps: [] },
-    { id: 'CHK-102', epic: 'CHK', title: 'Cart summary component', pts: 3, deps: ['CHK-101'] },
-    { id: 'CHK-103', epic: 'CHK', title: 'Address form + validation', pts: 5, deps: ['CHK-101'] },
-    { id: 'CHK-104', epic: 'CHK', title: 'Payment step UI', pts: 5, deps: ['CHK-102', 'PAY-201'] },
-    { id: 'CHK-105', epic: 'CHK', title: 'Review & place order', pts: 3, deps: ['CHK-103', 'CHK-104'] },
-    { id: 'CHK-106', epic: 'CHK', title: 'Responsive pass', pts: 2, deps: ['CHK-105'] },
-    { id: 'PAY-201', epic: 'PAY', title: 'Tokenization contract', pts: 2, deps: [] },
-    { id: 'PAY-202', epic: 'PAY', title: 'Card vault integration', pts: 8, deps: ['PAY-201'], features: ['payments'] },
-    { id: 'PAY-205', epic: 'PAY', title: 'Idempotency keys', pts: 2, deps: ['PAY-201'] },
-    { id: 'PAY-203', epic: 'PAY', title: '3-D Secure challenge', pts: 5, deps: ['PAY-202'], features: ['payments', '3ds'] },
-    { id: 'PAY-204', epic: 'PAY', title: 'Refund endpoint', pts: 3, deps: ['PAY-202'], features: ['payments'] },
-    { id: 'PAY-206', epic: 'PAY', title: 'Failure retry policy', pts: 3, deps: ['PAY-203', 'PAY-205'], features: ['3ds'] },
-    { id: 'ORD-301', epic: 'ORD', title: 'Order event schema', pts: 1, deps: [] },
-    { id: 'ORD-302', epic: 'ORD', title: 'Confirmation email', pts: 2, deps: ['ORD-301'] },
-    { id: 'ORD-303', epic: 'ORD', title: 'Receipt PDF service', pts: 5, deps: ['ORD-301', 'PAY-204'] },
-    { id: 'ORD-304', epic: 'ORD', title: 'Order status webhook', pts: 3, deps: ['ORD-301', 'PAY-206'] },
-    { id: 'ORD-305', epic: 'ORD', title: 'Post-purchase upsell', pts: 2, deps: ['CHK-105'], features: ['upsell'] },
-    { id: 'ORD-306', epic: 'ORD', title: 'E2E happy-path suite', pts: 8, deps: ['CHK-106', 'ORD-304'] }
+    { id: 'CHK-102', epic: 'CHK', title: 'Cart summary component', pts: 3, deps: ['CHK-101'], roles: ['frontend'] },
+    { id: 'CHK-103', epic: 'CHK', title: 'Address form + validation', pts: 5, deps: ['CHK-101'], roles: ['frontend'] },
+    { id: 'CHK-104', epic: 'CHK', title: 'Payment step UI', pts: 5, deps: ['CHK-102', 'PAY-201'], roles: ['frontend'] },
+    { id: 'CHK-105', epic: 'CHK', title: 'Review & place order', pts: 3, deps: ['CHK-103', 'CHK-104'], roles: ['frontend'] },
+    { id: 'CHK-106', epic: 'CHK', title: 'Responsive pass', pts: 2, deps: ['CHK-105'], roles: ['frontend'] },
+    { id: 'PAY-201', epic: 'PAY', title: 'Tokenization contract', pts: 2, deps: [], roles: ['backend'] },
+    { id: 'PAY-202', epic: 'PAY', title: 'Card vault integration', pts: 8, deps: ['PAY-201'], features: ['payments'], roles: ['backend'] },
+    { id: 'PAY-205', epic: 'PAY', title: 'Idempotency keys', pts: 2, deps: ['PAY-201'], roles: ['backend'] },
+    { id: 'PAY-203', epic: 'PAY', title: '3-D Secure challenge', pts: 5, deps: ['PAY-202'], features: ['payments', '3ds'], roles: ['backend'] },
+    { id: 'PAY-204', epic: 'PAY', title: 'Refund endpoint', pts: 3, deps: ['PAY-202'], features: ['payments'], roles: ['backend'] },
+    { id: 'PAY-206', epic: 'PAY', title: 'Failure retry policy', pts: 3, deps: ['PAY-203', 'PAY-205'], features: ['3ds'], roles: ['backend'] },
+    { id: 'ORD-301', epic: 'ORD', title: 'Order event schema', pts: 1, deps: [], roles: ['backend'] },
+    { id: 'ORD-302', epic: 'ORD', title: 'Confirmation email', pts: 2, deps: ['ORD-301'], roles: ['backend'] },
+    { id: 'ORD-303', epic: 'ORD', title: 'Receipt PDF service', pts: 5, deps: ['ORD-301', 'PAY-204'], roles: ['backend'] },
+    { id: 'ORD-304', epic: 'ORD', title: 'Order status webhook', pts: 3, deps: ['ORD-301', 'PAY-206'], roles: ['backend'] },
+    { id: 'ORD-305', epic: 'ORD', title: 'Post-purchase upsell', pts: 2, deps: ['CHK-105'], features: ['upsell'], roles: ['frontend'] },
+    { id: 'ORD-306', epic: 'ORD', title: 'E2E happy-path suite', pts: 8, deps: ['CHK-106', 'ORD-304'], roles: ['qa'] }
   ];
 
   AVATARS = ['oklch(0.62 0.13 255)', 'oklch(0.62 0.13 155)', 'oklch(0.62 0.13 65)', 'oklch(0.62 0.13 320)', 'oklch(0.62 0.13 200)', 'oklch(0.62 0.13 20)'];
 
   state = {
     people: [
-      { id: 'p1', name: 'Maya Okonkwo', cap: 21 },
-      { id: 'p2', name: 'Liam Petrov', cap: 26 },
-      { id: 'p3', name: 'Sofia Reyes', cap: 18 },
-      { id: 'p4', name: 'Dev Rao', cap: 13 }
+      { id: 'p1', name: 'Maya Okonkwo', roles: ['frontend'], cap: 21, blocks: [] },
+      { id: 'p2', name: 'Liam Petrov', roles: ['backend'], cap: 26, blocks: [] },
+      { id: 'p3', name: 'Sofia Reyes', roles: ['frontend', 'backend'], cap: 18, blocks: [] },
+      { id: 'p4', name: 'Dev Rao', roles: ['qa'], cap: 13, blocks: [] }
     ],
     assign: {},
     past: [], future: [],
     toast: null, dragId: null, overRow: null, hover: null, shake: null,
-    source: 'built-in sample data', savedAt: null,
+    source: 'built-in sample data', planFile: null, savedAt: null,
     graphFullscreen: false,
     graphWidthPx: 640,
     resizingSplit: false,
     multiSprint: false,
     featureFlags: {},
+    autoPlanOpts: Object.assign({}, AutoPlan.DEFAULTS),
     ganttDayPx: 58,
     graphEdit: false,
     pendingParent: null
@@ -389,6 +410,7 @@ class Component extends DCLogic {
     if (tk.status === 'fulfilled' && tk.value) {
       const d = tk.value;
       if (d.sprint) this.SPRINT = Object.assign({}, this.SPRINT, d.sprint);
+      this.setState({ autoPlanOpts: Object.assign({}, AutoPlan.DEFAULTS, this.SPRINT.autoPlan || {}) });
       if (Array.isArray(d.epics) && d.epics.length) this.EPICS = d.epics;
       if (d.sizes) {
         const sz = {};
@@ -396,14 +418,23 @@ class Component extends DCLogic {
         this.SIZES = sz;
       }
       if (Array.isArray(d.tickets) && d.tickets.length) {
-        this.TICKETS = d.tickets.map(t => Object.assign({ deps: [] }, t, { pts: t.pts == null ? 1 : t.pts }));
+        this.TICKETS = d.tickets.map(t => Object.assign({ deps: [], roles: [] }, t, {
+          pts: t.pts == null ? 1 : t.pts,
+          roles: Array.isArray(t.roles) ? t.roles : []
+        }));
       }
       got.push('tickets.json');
     }
     if (tm.status === 'fulfilled' && tm.value) {
       const list = Array.isArray(tm.value) ? tm.value : (tm.value.team || tm.value.people || []);
       if (list.length) {
-        const people = list.map((p, i) => ({ id: p.id || ('p' + (i + 1)), name: p.name || 'Teammate', role: p.role || '', cap: p.capacity ?? p.cap ?? 20 }));
+        const people = list.map((p, i) => ({
+          id: p.id || ('p' + (i + 1)),
+          name: p.name || 'Teammate',
+          roles: Array.isArray(p.roles) ? p.roles : [],
+          cap: p.capacity ?? p.cap ?? 20,
+          blocks: Array.isArray(p.blocks) ? p.blocks : []
+        }));
         this.nextPid = this.maxNextPid(people);
         this.setState({ people });
       }
@@ -457,7 +488,16 @@ class Component extends DCLogic {
     });
 
     const people = plan.length
-      ? plan.map((p, i) => ({ id: p.id || ('p' + (i + 1)), name: p.name || 'Teammate', cap: p.capacityPts ?? p.capacity ?? p.cap ?? 20 }))
+      ? plan.map((p, i) => {
+          const prev = this.state.people.find(x => x.id === (p.id || ('p' + (i + 1))));
+          return {
+            id: p.id || ('p' + (i + 1)),
+            name: p.name || 'Teammate',
+            roles: Array.isArray(p.roles) ? p.roles : (prev && prev.roles) || [],
+            cap: p.capacityPts ?? p.capacity ?? p.cap ?? 20,
+            blocks: Array.isArray(p.blocks) ? p.blocks : ((prev && prev.blocks) || [])
+          };
+        })
       : this.state.people;
     const byId = {}; people.forEach(p => { byId[p.id] = p; });
     const byName = {}; people.forEach(p => { byName[p.name.trim().toLowerCase()] = p; });
@@ -485,14 +525,15 @@ class Component extends DCLogic {
         sprintDays: this.sprintDays(),
         maxSprints: multiSprint ? SprintHorizon.MAX_SPRINTS : 1,
         daysOf: (pts) => this.days(pts),
-        strict: this.strict()
+        strict: this.strict(),
+        dates: this.dateIsos(multiSprint ? SprintHorizon.MAX_SPRINTS : 1)
       })
     );
     if (!multiSprint) packed = SprintHorizon.stripLaterSprints(packed, this.sprintDays());
 
     this.nextPid = this.maxNextPid(people);
     this.commit(() => ({ people, assign: packed, multiSprint, featureFlags }));
-    this.setState({ source: filename, savedAt: null });
+    this.setState({ planFile: filename, savedAt: null });
     this.say(skipped.length ? 'warn' : 'ok',
       `Loaded ${Object.keys(assign).length} scheduled ticket${Object.keys(assign).length === 1 ? '' : 's'} from ${filename}${skipped.length ? ` · skipped ${skipped.join(', ')}` : ''}`);
   }
@@ -512,31 +553,41 @@ class Component extends DCLogic {
       const day = String(d.getDate()).padStart(2, '0');
       return `${y}-${m}-${day}`;
     };
+    const dateIsos = dates.map(d => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    });
     const gantt = Object.keys(s.assign).sort((a, b) => s.assign[a].start - s.assign[b].start).map(id => {
       const a = s.assign[id], t = tickets.find(x => x.id === id) || this.ticket(id);
       const person = s.people.find(p => p.id === a.personId);
-      const unmet = (t.deps || []).filter(d => { const da = s.assign[d]; return !da || da.start + da.days > a.start + 1e-9; });
+      const end = this.assignEnd(a, s.people, dateIsos);
+      const unmet = (t.deps || []).filter(d => {
+        const da = s.assign[d];
+        return !da || this.assignEnd(da, s.people, dateIsos) > a.start + 1e-9;
+      });
       return {
         ticket: id, epic: t.epic, title: t.title, points: t.pts,
         assignee: person ? person.name : null, assigneeId: a.personId,
-        startDay: +(a.start + 1).toFixed(2), endDay: +(a.start + a.days).toFixed(2),
-        durationDays: a.days, startDate: iso(a.start), endDate: iso(a.start + a.days - 0.01),
+        startDay: +(a.start + 1).toFixed(2), endDay: +end.toFixed(2),
+        durationDays: a.days, startDate: iso(a.start), endDate: iso(end - 0.01),
         dependencies: t.deps, unmetDependencies: unmet
       };
     });
-    const capHorizon = p => p.cap * nVisible;
     const capacity = s.people.map(p => {
       const used = this.usedBy(p.id, s.assign);
-      const cap = capHorizon(p);
+      const cap = this.effCapHorizon(p, nVisible, sprint, dateIsos);
       return {
         id: p.id, name: p.name, capacityPts: p.cap, plannedPts: used,
         remainingPts: cap - used,
         utilization: cap ? +((used / cap) * 100).toFixed(1) : null,
         overCommitted: used > cap,
+        blocks: Array.isArray(p.blocks) ? p.blocks : [],
         tickets: gantt.filter(g => g.assigneeId === p.id).map(g => g.ticket)
       };
     });
-    const teamHorizon = s.people.reduce((a, p) => a + capHorizon(p), 0);
+    const teamHorizon = s.people.reduce((a, p) => a + this.effCapHorizon(p, nVisible, sprint, dateIsos), 0);
     const out = {
       generatedAt: new Date().toISOString(),
       sprint: { name: this.SPRINT.name, start: this.SPRINT.start, workingDays: sprint, multiSprint: !!s.multiSprint },
@@ -775,12 +826,41 @@ class Component extends DCLogic {
     if (this.state.pendingParent) this.setState({ pendingParent: null });
   };
 
+  dateIsos(nSprints) {
+    const sprint = this.sprintDays();
+    const n = (nSprints == null
+      ? (this.state.multiSprint ? SprintHorizon.MAX_SPRINTS : 1)
+      : nSprints) * sprint;
+    return this.sprintDates(n).map(d => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    });
+  }
+
+  assignEnd(a, people, dates) {
+    const p = (people || this.state.people).find(x => x.id === a.personId);
+    const blocked = SprintHorizon.blockDaySet(p && p.blocks, dates || this.dateIsos());
+    return SprintHorizon.spanEnd(a.start, a.days, blocked);
+  }
+
+  effCapHorizon(p, nVisible, sprint, dates) {
+    const blocked = SprintHorizon.blockDaySet(p.blocks, dates);
+    let sum = 0;
+    for (let si = 0; si < nVisible; si++) {
+      sum += SprintHorizon.effectiveCap(p.cap, sprint, SprintHorizon.blockedInSprint(blocked, si, sprint));
+    }
+    return sum;
+  }
+
   planWithTickets(tickets, t, pid, assign, people) {
     return SprintHorizon.planAssignment(t, pid, assign, people, tickets, {
       sprintDays: this.sprintDays(),
       maxSprints: this.state.multiSprint ? SprintHorizon.MAX_SPRINTS : 1,
       daysOf: (pts) => this.days(pts),
-      strict: this.strict()
+      strict: this.strict(),
+      dates: this.dateIsos()
     });
   }
 
@@ -859,6 +939,32 @@ class Component extends DCLogic {
     if (!Object.keys(this.state.assign).length) { this.say('info', 'Board is already empty'); return; }
     this.commit(() => ({ assign: {} }));
     this.say('info', 'Board cleared — ⌘Z to bring it back');
+  };
+
+  setAutoPlanOpt(key, value) {
+    const parsed = parseFloat(value);
+    const v = isNaN(parsed) ? 0 : Math.max(0, parsed);
+    this.setState(s => ({ autoPlanOpts: Object.assign({}, s.autoPlanOpts, { [key]: v }) }));
+  }
+
+  autoPlan = () => {
+    const s = this.state;
+    const tickets = this.visibleTickets();
+    const { assign, planned, skipped } = AutoPlan.autoPlan(
+      s.assign, s.people, tickets,
+      (t, pid, a, p) => this.planWithTickets(tickets, t, pid, a, p),
+      Object.assign({ sprintDays: this.sprintDays(), daysOf: (pts) => this.days(pts) }, s.autoPlanOpts)
+    );
+    const more = skipped.length > 3 ? `, +${skipped.length - 3} more` : '';
+    const left = skipped.length
+      ? ` · ${skipped.length} left: ${skipped.slice(0, 3).map(x => `${x.id} (${x.hint})`).join(', ')}${more}`
+      : '';
+    if (!planned.length) {
+      this.say('info', skipped.length ? `Auto-plan placed nothing${left}` : 'No unassigned tickets to auto-plan');
+      return;
+    }
+    this.commit(() => ({ assign }));
+    this.say(skipped.length ? 'warn' : 'ok', `Auto-planned ${planned.length} ticket${planned.length === 1 ? '' : 's'}${left}`);
   };
 
   toggleMultiSprint = () => {
@@ -945,7 +1051,7 @@ class Component extends DCLogic {
 
   addPerson = () => {
     const id = 'p' + (this.nextPid++);
-    this.commit(s => ({ people: [...s.people, { id, name: 'New teammate', cap: 20 }] }));
+    this.commit(s => ({ people: [...s.people, { id, name: 'New teammate', roles: [], cap: 20, blocks: [] }] }));
     this.say('info', 'Teammate added — set their name and capacity');
   };
 
@@ -1192,6 +1298,7 @@ class Component extends DCLogic {
     const hover = s.hover;
 
     // violations recomputed live
+    const planDates = this.dateIsos();
     const violation = {};
     Object.keys(s.assign).forEach(id => {
       const a = s.assign[id];
@@ -1199,7 +1306,7 @@ class Component extends DCLogic {
       if (!t) return;
       const bad = (t.deps || []).filter(d => {
         const da = s.assign[d];
-        return !da || da.start + da.days > a.start + 1e-9;
+        return !da || this.assignEnd(da, s.people, planDates) > a.start + 1e-9;
       });
       if (bad.length) violation[id] = `Overlaps or precedes ${bad.join(', ')}`;
     });
@@ -1235,7 +1342,9 @@ class Component extends DCLogic {
         cursor: editing ? 'pointer' : (a ? 'pointer' : (s.graphFullscreen ? 'default' : 'grab')),
         tip: editing
           ? (pending ? `${t.id} selected · click a child` : `${t.title} · click to link · −/+ to resize`)
-          : (a ? `${t.title} — assigned to ${person ? person.name : ''} · click the bar to unassign` : `${t.title} · ${t.pts} pts (${sz.t}, ${sz.d} days)${t.deps.length ? ' · needs ' + t.deps.join(', ') : ''}`),
+          : (a
+            ? `${t.title} — assigned to ${person ? person.name : ''} · click the bar to unassign`
+            : `${t.title} · ${t.pts} pts (${sz.t}, ${sz.d} days)${(t.roles || []).length ? ' · roles ' + t.roles.join(', ') : ''}${t.deps.length ? ' · needs ' + t.deps.join(', ') : ''}`),
         bg: a ? 'transparent' : `oklch(0.975 0.022 ${r.hue})`,
         border: pending
           ? '2px solid #2A2721'
@@ -1341,20 +1450,39 @@ class Component extends DCLogic {
 
     const dragT = s.dragId ? this.ticket(s.dragId) : null;
 
+    const ganttDateIsos = dates.map(d => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    });
+
     const rows = s.people.map((p, pi) => {
       const used = this.usedBy(p.id, s.assign);
-      const den = p.cap * nVisible;
+      const den = this.effCapHorizon(p, nVisible, sprint, ganttDateIsos);
       const over = used > den;
       const pct = den > 0 ? Math.min(100, (used / den) * 100) : (used > 0 ? 100 : 0);
+      const pBlocked = SprintHorizon.blockDaySet(p.blocks, ganttDateIsos);
+      const blockWashes = [];
+      pBlocked.forEach(i => {
+        if (i < 0 || i >= totalDays) return;
+        blockWashes.push({
+          left: (i / totalDays) * 100,
+          width: (1 / totalDays) * 100
+        });
+      });
       const bars = Object.keys(s.assign).filter(k => s.assign[k].personId === p.id).map(k => {
         const a = s.assign[k]; const t = this.ticket(k);
         const hue = (this.epic(t.epic) || { hue: 40 }).hue;
-        const wpc = (a.days / totalDays) * 100;
+        const end = SprintHorizon.spanEnd(a.start, a.days, pBlocked);
+        const span = end - a.start;
+        const wpc = (span / totalDays) * 100;
         const lit = hover === k;
         const si = SprintHorizon.sprintIndex(a.start, sprint);
         const dayIn = a.start - si * sprint + 1;
-        const dayEnd = a.start + a.days - si * sprint;
-        const where = si > 0 ? `sprint ${si + 1} day ${dayIn.toFixed(dayIn % 1 ? 1 : 0)}–${dayEnd.toFixed(dayEnd % 1 ? 1 : 0)}` : `day ${dayIn.toFixed(dayIn % 1 ? 1 : 0)}–${(a.start + a.days).toFixed((a.start + a.days) % 1 ? 1 : 0)}`;
+        const dayEnd = end - si * sprint;
+        const where = si > 0 ? `sprint ${si + 1} day ${dayIn.toFixed(dayIn % 1 ? 1 : 0)}–${dayEnd.toFixed(dayEnd % 1 ? 1 : 0)}` : `day ${dayIn.toFixed(dayIn % 1 ? 1 : 0)}–${end.toFixed(end % 1 ? 1 : 0)}`;
+        const spanNote = span > a.days + 1e-9 ? ` · ${a.days}d work · spans block` : '';
         return {
           id: k, title: t.title,
           left: (a.start / totalDays) * 100, width: wpc,
@@ -1365,7 +1493,7 @@ class Component extends DCLogic {
           shadow: lit ? `0 8px 18px oklch(0.6 0.09 ${hue} / .3)` : '0 1px 2px rgba(40,34,22,.07)',
           transform: lit ? 'translateY(-2px)' : 'none',
           warn: violation[k] || null,
-          tip: `${t.id} · ${t.title} — ${t.pts} pts, ${a.days}d, ${where}. Click to unassign.${violation[k] ? ' ⚠ ' + violation[k] : ''}`,
+          tip: `${t.id} · ${t.title} — ${t.pts} pts, ${a.days}d, ${where}${spanNote}. Click to unassign.${violation[k] ? ' ⚠ ' + violation[k] : ''}`,
           onClick: () => this.unassign(k),
           onEnter: () => this.setState({ hover: k }),
           onLeave: () => this.setState(st => (st.hover === k ? { hover: null } : null))
@@ -1380,8 +1508,9 @@ class Component extends DCLogic {
           const hue = (this.epic(dragT.epic) || { hue: 40 }).hue;
           const psi = SprintHorizon.sprintIndex(r.start, sprint);
           const pday = r.start - psi * sprint + 1;
+          const pend = SprintHorizon.spanEnd(r.start, r.days, pBlocked);
           preview = {
-            left: (r.start / totalDays) * 100, width: (r.days / totalDays) * 100,
+            left: (r.start / totalDays) * 100, width: ((pend - r.start) / totalDays) * 100,
             bg: `oklch(0.97 0.03 ${hue} / .85)`,
             border: `1.5px dashed oklch(0.7 0.1 ${hue})`,
             ink: `oklch(0.45 0.11 ${hue})`,
@@ -1390,15 +1519,17 @@ class Component extends DCLogic {
         }
       }
 
+      const roles = p.roles || [];
       return {
         id: p.id, name: p.name, cap: p.cap, used, den, pct,
+        rolesLabel: roles.length ? roles.join(', ') : null,
         initials: this.initials(p.name),
         avatarBg: this.AVATARS[pi % this.AVATARS.length],
         capColor: over ? 'oklch(0.6 0.16 27)' : pct > 85 ? 'oklch(0.72 0.14 75)' : 'oklch(0.66 0.11 155)',
         capInk: over ? 'oklch(0.5 0.16 27)' : '#514C43',
         rowBg: s.overRow === p.id ? (blocked ? 'oklch(0.985 0.012 27)' : 'oklch(0.985 0.012 155)') : '#FFFFFF',
         anim: s.shake === p.id ? 'shakeRow .5s ease both' : 'none',
-        bars, preview, blocked,
+        bars, blockWashes, preview, blocked,
         onName: (e) => { const v = e.target.value; this.commit(st => ({ people: st.people.map(x => x.id === p.id ? Object.assign({}, x, { name: v }) : x) })); },
         onCap: (e) => {
           const parsed = parseInt(e.target.value || '0', 10);
@@ -1417,7 +1548,7 @@ class Component extends DCLogic {
       const t = ticketOf(k);
       return a + (t ? t.pts : 0);
     }, 0);
-    const teamCap = s.people.reduce((a, p) => a + p.cap * nVisible, 0);
+    const teamCap = s.people.reduce((a, p) => a + this.effCapHorizon(p, nVisible, sprint, ganttDateIsos), 0);
     const fillPct = teamCap ? Math.min(100, (plannedPts / teamCap) * 100) : 0;
     const multiOn = !!s.multiSprint;
     const featureNames = FeatureFlags.listFeatures(this.TICKETS);
@@ -1445,7 +1576,11 @@ class Component extends DCLogic {
       showFeatures: featureNames.length > 0,
       featureToggles,
       sprintName: this.SPRINT.name, sprintSub,
+      planFile: s.planFile, showPlanFile: !!s.planFile,
       undo: this.undo, redo: this.redo, clearAll: this.clearAll, addPerson: this.addPerson,
+      autoPlan: this.autoPlan, autoGain: s.autoPlanOpts.switchGainDays, autoSkew: s.autoPlanOpts.maxSkewPct,
+      onAutoGain: (e) => this.setAutoPlanOpt('switchGainDays', e.target.value),
+      onAutoSkew: (e) => this.setAutoPlanOpt('maxSkewPct', e.target.value),
       savePlan: this.savePlan, loadPlan: this.loadPlan, downloadTickets: this.downloadTickets, savedNote: s.savedAt ? 'Saved ' + s.savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
       undoColor: s.past.length ? '#1B1A17' : '#BDB6A9',
       redoColor: s.future.length ? '#1B1A17' : '#BDB6A9',

@@ -195,8 +195,10 @@
     const sizesOut = {};
     Object.keys(sizes || {}).forEach(k => { sizesOut[k] = sizeEntry(sizes[k]); });
     const sp = sprint || {};
+    const sprintOut = { name: sp.name, start: sp.start, days: sp.days };
+    if (sp.autoPlan) sprintOut.autoPlan = sp.autoPlan;
     return {
-      sprint: { name: sp.name, start: sp.start, days: sp.days },
+      sprint: sprintOut,
       sizes: sizesOut,
       epics: epics || [],
       tickets: (tickets || []).map(t => {

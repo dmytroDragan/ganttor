@@ -1,7 +1,7 @@
 # Block day ranges design
 
 **Date:** 2026-10-12  
-**Status:** approved (not implemented)
+**Status:** implemented (v0.7.0)
 
 ## Goal
 

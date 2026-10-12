@@ -1,8 +1,9 @@
 {
+  "roles": ["frontend", "backend", "qa"],
   "team": [
-    { "id": "p1", "name": "Maya Okonkwo", "role": "Frontend", "capacity": 21 },
-    { "id": "p2", "name": "Liam Petrov", "role": "Backend", "capacity": 26 },
-    { "id": "p3", "name": "Sofia Reyes", "role": "Full stack", "capacity": 18 },
-    { "id": "p4", "name": "Dev Rao", "role": "QA", "capacity": 13 }
+    { "id": "p1", "name": "Maya Okonkwo", "roles": ["frontend"], "capacity": 21, "blocks": [{ "start": "2026-08-13", "end": "2026-08-14" }] },
+    { "id": "p2", "name": "Liam Petrov", "roles": ["backend"], "capacity": 26 },
+    { "id": "p3", "name": "Sofia Reyes", "roles": ["frontend", "backend"], "capacity": 18 },
+    { "id": "p4", "name": "Dev Rao", "roles": ["qa"], "capacity": 13 }
   ]
 }
