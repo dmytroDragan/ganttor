@@ -43,7 +43,6 @@ Serve the project over HTTP (the app loads JSON via `fetch`). First load needs t
 
 ```bash
 npm start
-# or: python3 -m http.server 8000
 ```
 
 Open [http://localhost:8000/](http://localhost:8000/).
