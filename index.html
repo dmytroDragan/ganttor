@@ -11,6 +11,7 @@
 <script src="./src/graph-epic-order.js"></script>
 <script src="./src/graph-edge-arrow.js"></script>
 <script src="./src/sprint-horizon.js"></script>
+<script src="./src/feature-flags.js"></script>
 </head>
 <body>
 <x-dc>
@@ -104,6 +105,17 @@
         <div style="font-size:12px;font-weight:600;letter-spacing:.02em">Dependency graph</div>
         <div style="font-size:11.5px;color:#A29C90">{{ graphHint }}</div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:7px">
+          <sc-if value="{{ showFeatures }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:8px;border:1px solid #E4DFD5;background:#FFF">
+              <span style="font-size:11px;font-weight:600;color:#8A857B;letter-spacing:.04em;text-transform:uppercase">Features</span>
+              <sc-for list="{{ featureToggles }}" as="f" hint-placeholder-count="2">
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:#514C43;cursor:pointer;user-select:none">
+                  <input type="checkbox" checked="{{ f.on }}" onChange="{{ f.onChange }}" style="margin:0;accent-color:#2A2721;cursor:pointer">
+                  {{ f.name }}
+                </label>
+              </sc-for>
+            </div>
+          </sc-if>
           <button onClick="{{ toggleGraphEdit }}" title="{{ editTitle }}" style="display:flex;align-items:center;gap:8px;padding:6px 11px;border-radius:8px;border:1px solid {{ editBorder }};background:{{ editBg }};font-family:inherit;font-size:12px;font-weight:600;color:{{ editInk }};cursor:pointer;transition:background .15s,border-color .15s,color .15s" style-hover="background:{{ editHover }}">
             <span style="position:relative;width:22px;height:12px;border-radius:99px;background:{{ editKnobTrack }};flex:0 0 auto">
               <span style="position:absolute;top:1px;left:{{ editKnobLeft }};width:10px;height:10px;border-radius:50%;background:{{ editKnob }};transition:left .15s"></span>
@@ -328,16 +340,16 @@ class Component extends DCLogic {
     { id: 'CHK-105', epic: 'CHK', title: 'Review & place order', pts: 3, deps: ['CHK-103', 'CHK-104'] },
     { id: 'CHK-106', epic: 'CHK', title: 'Responsive pass', pts: 2, deps: ['CHK-105'] },
     { id: 'PAY-201', epic: 'PAY', title: 'Tokenization contract', pts: 2, deps: [] },
-    { id: 'PAY-202', epic: 'PAY', title: 'Card vault integration', pts: 8, deps: ['PAY-201'] },
+    { id: 'PAY-202', epic: 'PAY', title: 'Card vault integration', pts: 8, deps: ['PAY-201'], features: ['payments'] },
     { id: 'PAY-205', epic: 'PAY', title: 'Idempotency keys', pts: 2, deps: ['PAY-201'] },
-    { id: 'PAY-203', epic: 'PAY', title: '3-D Secure challenge', pts: 5, deps: ['PAY-202'] },
-    { id: 'PAY-204', epic: 'PAY', title: 'Refund endpoint', pts: 3, deps: ['PAY-202'] },
-    { id: 'PAY-206', epic: 'PAY', title: 'Failure retry policy', pts: 3, deps: ['PAY-203', 'PAY-205'] },
+    { id: 'PAY-203', epic: 'PAY', title: '3-D Secure challenge', pts: 5, deps: ['PAY-202'], features: ['payments', '3ds'] },
+    { id: 'PAY-204', epic: 'PAY', title: 'Refund endpoint', pts: 3, deps: ['PAY-202'], features: ['payments'] },
+    { id: 'PAY-206', epic: 'PAY', title: 'Failure retry policy', pts: 3, deps: ['PAY-203', 'PAY-205'], features: ['3ds'] },
     { id: 'ORD-301', epic: 'ORD', title: 'Order event schema', pts: 1, deps: [] },
     { id: 'ORD-302', epic: 'ORD', title: 'Confirmation email', pts: 2, deps: ['ORD-301'] },
     { id: 'ORD-303', epic: 'ORD', title: 'Receipt PDF service', pts: 5, deps: ['ORD-301', 'PAY-204'] },
     { id: 'ORD-304', epic: 'ORD', title: 'Order status webhook', pts: 3, deps: ['ORD-301', 'PAY-206'] },
-    { id: 'ORD-305', epic: 'ORD', title: 'Post-purchase upsell', pts: 2, deps: ['CHK-105'] },
+    { id: 'ORD-305', epic: 'ORD', title: 'Post-purchase upsell', pts: 2, deps: ['CHK-105'], features: ['upsell'] },
     { id: 'ORD-306', epic: 'ORD', title: 'E2E happy-path suite', pts: 8, deps: ['CHK-106', 'ORD-304'] }
   ];
 
@@ -358,6 +370,7 @@ class Component extends DCLogic {
     graphWidthPx: 640,
     resizingSplit: false,
     multiSprint: false,
+    featureFlags: {},
     ganttDayPx: 58,
     graphEdit: false,
     pendingParent: null
@@ -459,9 +472,16 @@ class Component extends DCLogic {
       assign[t.id] = { personId: p.id, start, days: this.days(t.pts) };
     });
     const multiSprint = !!(data.sprint && data.sprint.multiSprint);
+    const featureFlags = (data.featureFlags && typeof data.featureFlags === 'object' && !Array.isArray(data.featureFlags))
+      ? Object.assign({}, data.featureFlags)
+      : {};
+    const visible = FeatureFlags.projectTickets(this.TICKETS, featureFlags);
+    Object.keys(assign).forEach(id => {
+      if (!visible.find(t => t.id === id)) delete assign[id];
+    });
     let packed = UnassignRecalc.repackAssign(
-      assign, people, this.TICKETS,
-      (t, pid, a, p) => SprintHorizon.planAssignment(t, pid, a, p, this.TICKETS, {
+      assign, people, visible,
+      (t, pid, a, p) => SprintHorizon.planAssignment(t, pid, a, p, visible, {
         sprintDays: this.sprintDays(),
         maxSprints: multiSprint ? SprintHorizon.MAX_SPRINTS : 1,
         daysOf: (pts) => this.days(pts),
@@ -471,7 +491,7 @@ class Component extends DCLogic {
     if (!multiSprint) packed = SprintHorizon.stripLaterSprints(packed, this.sprintDays());
 
     this.nextPid = this.maxNextPid(people);
-    this.commit(() => ({ people, assign: packed, multiSprint }));
+    this.commit(() => ({ people, assign: packed, multiSprint, featureFlags }));
     this.setState({ source: filename, savedAt: null });
     this.say(skipped.length ? 'warn' : 'ok',
       `Loaded ${Object.keys(assign).length} scheduled ticket${Object.keys(assign).length === 1 ? '' : 's'} from ${filename}${skipped.length ? ` · skipped ${skipped.join(', ')}` : ''}`);
@@ -479,6 +499,7 @@ class Component extends DCLogic {
 
   savePlan = () => {
     const s = this.state, sprint = this.sprintDays();
+    const tickets = this.visibleTickets();
     const nVisible = s.multiSprint
       ? SprintHorizon.visibleSprintCount(s.assign, sprint, SprintHorizon.MAX_SPRINTS)
       : 1;
@@ -492,9 +513,9 @@ class Component extends DCLogic {
       return `${y}-${m}-${day}`;
     };
     const gantt = Object.keys(s.assign).sort((a, b) => s.assign[a].start - s.assign[b].start).map(id => {
-      const a = s.assign[id], t = this.ticket(id);
+      const a = s.assign[id], t = tickets.find(x => x.id === id) || this.ticket(id);
       const person = s.people.find(p => p.id === a.personId);
-      const unmet = t.deps.filter(d => { const da = s.assign[d]; return !da || da.start + da.days > a.start + 1e-9; });
+      const unmet = (t.deps || []).filter(d => { const da = s.assign[d]; return !da || da.start + da.days > a.start + 1e-9; });
       return {
         ticket: id, epic: t.epic, title: t.title, points: t.pts,
         assignee: person ? person.name : null, assigneeId: a.personId,
@@ -519,11 +540,12 @@ class Component extends DCLogic {
     const out = {
       generatedAt: new Date().toISOString(),
       sprint: { name: this.SPRINT.name, start: this.SPRINT.start, workingDays: sprint, multiSprint: !!s.multiSprint },
+      featureFlags: Object.assign({}, s.featureFlags || {}),
       totals: {
-        backlogPts: this.TICKETS.reduce((a, t) => a + t.pts, 0),
+        backlogPts: tickets.reduce((a, t) => a + t.pts, 0),
         plannedPts: gantt.reduce((a, g) => a + g.points, 0),
         teamCapacityPts: teamHorizon,
-        unplannedTickets: this.TICKETS.filter(t => !s.assign[t.id]).map(t => t.id)
+        unplannedTickets: tickets.filter(t => !s.assign[t.id]).map(t => t.id)
       },
       capacityPlan: capacity,
       gantt
@@ -619,7 +641,15 @@ class Component extends DCLogic {
     document.body.style.userSelect = 'none';
   };
 
-  ticket(id) { return this.TICKETS.find(t => t.id === id); }
+  visibleTickets() {
+    return FeatureFlags.projectTickets(this.TICKETS, this.state.featureFlags || {});
+  }
+
+  sourceTicket(id) { return this.TICKETS.find(t => t.id === id); }
+
+  ticket(id) {
+    return this.visibleTickets().find(t => t.id === id) || this.sourceTicket(id);
+  }
   epic(id) { return this.EPICS.find(e => e.id === id); }
   days(pts) { const s = this.SIZES[pts]; return s ? s.d : pts; }
   sprintDays() { return Math.max(3, this.SPRINT.days ?? this.props.sprintDays ?? 10); }
@@ -684,6 +714,7 @@ class Component extends DCLogic {
       people: s.people,
       assign: s.assign,
       multiSprint: !!s.multiSprint,
+      featureFlags: Object.assign({}, s.featureFlags || {}),
       tickets: GraphEdit.cloneTickets(this.TICKETS)
     };
   }
@@ -691,7 +722,12 @@ class Component extends DCLogic {
   boardFromSnap(snap) {
     if (snap.tickets) this.TICKETS = GraphEdit.cloneTickets(snap.tickets);
     this.nextPid = this.maxNextPid(snap.people);
-    return { people: snap.people, assign: snap.assign, multiSprint: !!snap.multiSprint };
+    return {
+      people: snap.people,
+      assign: snap.assign,
+      multiSprint: !!snap.multiSprint,
+      featureFlags: Object.assign({}, snap.featureFlags || {})
+    };
   }
 
   commit(fn) {
@@ -750,9 +786,10 @@ class Component extends DCLogic {
 
   applyGraphEdit(nextTickets, addedDep, okMsg) {
     const s = this.state;
+    const visible = FeatureFlags.projectTickets(nextTickets, s.featureFlags || {});
     const { assign, returned } = GraphEdit.refreshAssign(
-      s.assign, s.people, nextTickets,
-      (t, pid, a, p) => this.planWithTickets(nextTickets, t, pid, a, p),
+      s.assign, s.people, visible,
+      (t, pid, a, p) => this.planWithTickets(visible, t, pid, a, p),
       addedDep || null
     );
     this.commit(() => ({ tickets: nextTickets, assign }));
@@ -796,12 +833,18 @@ class Component extends DCLogic {
   onEdgeClick(parentId, childId, e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
     if (!this.state.graphEdit) return;
+    const src = this.sourceTicket(childId);
+    if (!src || (src.deps || []).indexOf(parentId) < 0) {
+      this.say('info', 'Bridged dependency — re-enable features to edit');
+      return;
+    }
     const next = GraphEdit.removeDep(this.TICKETS, parentId, childId);
     this.applyGraphEdit(next, null, `${childId} no longer needs ${parentId}`);
   }
 
   downloadTickets = () => {
-    const out = GraphEdit.exportTickets(this.SPRINT, this.SIZES, this.EPICS, this.TICKETS);
+    const vis = this.visibleTickets();
+    const out = GraphEdit.exportTickets(this.SPRINT, this.SIZES, this.EPICS, vis);
     const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -809,7 +852,7 @@ class Component extends DCLogic {
     a.download = 'tickets.json';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    this.say('ok', `Downloaded tickets.json — ${this.TICKETS.length} ticket${this.TICKETS.length === 1 ? '' : 's'}`);
+    this.say('ok', `Downloaded tickets.json — ${vis.length} ticket${vis.length === 1 ? '' : 's'}`);
   };
 
   clearAll = () => {
@@ -841,8 +884,27 @@ class Component extends DCLogic {
   };
 
   plan(t, pid, assign, people) {
-    return this.planWithTickets(this.TICKETS, t, pid, assign, people);
+    return this.planWithTickets(this.visibleTickets(), t, pid, assign, people);
   }
+
+  setFeatureFlag = (name, on) => {
+    this.commit(s => {
+      const featureFlags = Object.assign({}, s.featureFlags, { [name]: !!on });
+      const visible = FeatureFlags.projectTickets(this.TICKETS, featureFlags);
+      const keep = {};
+      visible.forEach(t => { keep[t.id] = true; });
+      const assign = {};
+      Object.keys(s.assign).forEach(id => {
+        if (keep[id]) assign[id] = s.assign[id];
+      });
+      const packed = UnassignRecalc.repackAssign(
+        assign, s.people, visible,
+        (t, pid, a, p) => this.planWithTickets(visible, t, pid, a, p)
+      );
+      return { featureFlags, assign: packed };
+    });
+    this.say('ok', on ? `Feature “${name}” on` : `Feature “${name}” off`);
+  };
 
   drop = (pid) => {
     const t = this.ticket(this.state.dragId);
@@ -869,9 +931,10 @@ class Component extends DCLogic {
 
   unassign(id) {
     const s = this.state;
+    const tickets = this.visibleTickets();
     const { assign, removed } = UnassignRecalc.applyUnassign(
-      id, s.assign, s.people, this.TICKETS,
-      (t, pid, a, p) => this.plan(t, pid, a, p)
+      id, s.assign, s.people, tickets,
+      (t, pid, a, p) => this.planWithTickets(tickets, t, pid, a, p)
     );
     this.commit(() => ({ assign }));
     const extra = [...removed].filter(x => x !== id);
@@ -889,16 +952,17 @@ class Component extends DCLogic {
   removePerson(pid) {
     this.commit(s => {
       const people = s.people.filter(p => p.id !== pid);
+      const tickets = FeatureFlags.projectTickets(this.TICKETS, s.featureFlags || {});
       const roots = Object.keys(s.assign).filter(k => s.assign[k].personId === pid);
       const remove = new Set();
       roots.forEach(id => {
-        UnassignRecalc.idsToReturn(id, this.TICKETS, s.assign).forEach(x => remove.add(x));
+        UnassignRecalc.idsToReturn(id, tickets, s.assign).forEach(x => remove.add(x));
       });
       const kept = {};
       Object.keys(s.assign).forEach(k => { if (!remove.has(k)) kept[k] = s.assign[k]; });
       const assign = UnassignRecalc.repackAssign(
-        kept, people, this.TICKETS,
-        (t, pId, a, p) => this.plan(t, pId, a, p)
+        kept, people, tickets,
+        (t, pId, a, p) => this.planWithTickets(tickets, t, pId, a, p)
       );
       return { people, assign };
     });
@@ -912,6 +976,8 @@ class Component extends DCLogic {
   }
 
   layout() {
+    const tickets = this.visibleTickets();
+    const ticketOf = (id) => tickets.find(t => t.id === id);
     const scale = this.props.nodeScale ?? 1;
     const GAP_Y = 28, GAP_X = 18, LANE_GAP = 24, PAD = 28, TOP = 56;
     const rects = {}; const columns = [];
@@ -923,7 +989,7 @@ class Component extends DCLogic {
     const depDepth = (id) => {
       if (depth[id] != null) return depth[id];
       if (visiting[id]) return 0;
-      const t = this.ticket(id);
+      const t = ticketOf(id);
       if (!t) { depth[id] = 0; return 0; }
       visiting[id] = true;
       const parents = t.deps || [];
@@ -931,14 +997,14 @@ class Component extends DCLogic {
       delete visiting[id];
       return depth[id];
     };
-    this.TICKETS.forEach(t => depDepth(t.id));
+    tickets.forEach(t => depDepth(t.id));
     // Enforce invariant across the whole graph (handles cycles / odd edges)
     {
-      let guard = this.TICKETS.length * this.TICKETS.length + 1;
+      let guard = tickets.length * tickets.length + 1;
       let changed = true;
       while (changed && guard-- > 0) {
         changed = false;
-        this.TICKETS.forEach(t => {
+        tickets.forEach(t => {
           (t.deps || []).forEach(p => {
             if (depth[p] == null) return;
             const need = depth[p] + 1;
@@ -952,12 +1018,12 @@ class Component extends DCLogic {
     }
 
     const sideOf = (t) => 52 * Math.sqrt(t.pts == null ? 1 : t.pts) * scale;
-    const maxD = this.TICKETS.reduce((m, t) => Math.max(m, depth[t.id] || 0), 0);
+    const maxD = tickets.reduce((m, t) => Math.max(m, depth[t.id] || 0), 0);
     const rowH = [];
     const nominal = 52 * scale;
     for (let d = 0; d <= maxD; d++) {
       let h = 0;
-      this.TICKETS.forEach(t => {
+      tickets.forEach(t => {
         if (depth[t.id] === d) h = Math.max(h, sideOf(t));
       });
       rowH[d] = h;
@@ -971,10 +1037,10 @@ class Component extends DCLogic {
     }
 
     const epicCols = (typeof GraphEpicOrder !== 'undefined' && GraphEpicOrder.orderEpicColumns)
-      ? GraphEpicOrder.orderEpicColumns(this.EPICS, this.TICKETS)
+      ? GraphEpicOrder.orderEpicColumns(this.EPICS, tickets)
       : this.EPICS;
     epicCols.forEach((ep) => {
-      const list = this.TICKETS
+      const list = tickets
         .map((t, i) => ({ t, i }))
         .filter(({ t }) => t.epic === ep.id)
         .map(({ t, i }) => ({ t, i, side: sideOf(t) }));
@@ -1077,11 +1143,11 @@ class Component extends DCLogic {
 
     // Geometric guarantee: every child is strictly below every parent (cross-epic)
     {
-      let guard = this.TICKETS.length * this.TICKETS.length + 1;
+      let guard = tickets.length * tickets.length + 1;
       let changed = true;
       while (changed && guard-- > 0) {
         changed = false;
-        this.TICKETS.forEach(t => {
+        tickets.forEach(t => {
           const B = rects[t.id];
           if (!B) return;
           (t.deps || []).forEach(p => {
@@ -1103,6 +1169,8 @@ class Component extends DCLogic {
 
   renderVals() {
     const s = this.state;
+    const tickets = this.visibleTickets();
+    const ticketOf = (id) => tickets.find(t => t.id === id) || this.sourceTicket(id);
     const sprint = this.sprintDays();
     let { rects, columns, graphW, graphH } = this.layout();
     if (s.graphFullscreen) {
@@ -1127,21 +1195,24 @@ class Component extends DCLogic {
     const violation = {};
     Object.keys(s.assign).forEach(id => {
       const a = s.assign[id];
-      const bad = this.ticket(id).deps.filter(d => {
+      const t = ticketOf(id);
+      if (!t) return;
+      const bad = (t.deps || []).filter(d => {
         const da = s.assign[d];
         return !da || da.start + da.days > a.start + 1e-9;
       });
       if (bad.length) violation[id] = `Overlaps or precedes ${bad.join(', ')}`;
     });
 
-    const nodes = this.TICKETS.map(t => {
+    const nodes = tickets.map(t => {
       const r = rects[t.id];
       if (!r) return null;
       const a = s.assign[t.id];
       const ready = !a && t.deps.every(d => s.assign[d]);
       const sz = this.SIZES[t.pts] || { t: '?', d: t.pts };
       const person = a ? s.people.find(p => p.id === a.personId) : null;
-      const lit = hover === t.id || (hover && this.ticket(hover) && (this.ticket(hover).deps.includes(t.id) || t.deps.includes(hover)));
+      const hoverT = hover ? ticketOf(hover) : null;
+      const lit = hover === t.id || (hoverT && (hoverT.deps.includes(t.id) || t.deps.includes(hover)));
       const pending = s.graphEdit && s.pendingParent === t.id;
       const keys = Object.keys(this.SIZES).map(k => +k).filter(n => !isNaN(n)).sort((x, y) => x - y);
       const atMin = keys.length && +t.pts === keys[0];
@@ -1205,7 +1276,7 @@ class Component extends DCLogic {
     }).filter(Boolean);
 
     const edges = [];
-    this.TICKETS.forEach(t => t.deps.forEach(d => {
+    tickets.forEach(t => t.deps.forEach(d => {
       const A = rects[d], B = rects[t.id];
       if (!A || !B) return;
       const acx = A.x + A.w / 2, acy = A.y + A.h / 2, bcx = B.x + B.w / 2, bcy = B.y + B.h / 2;
@@ -1341,11 +1412,20 @@ class Component extends DCLogic {
       };
     });
 
-    const totalPts = this.TICKETS.reduce((a, t) => a + t.pts, 0);
-    const plannedPts = Object.keys(s.assign).reduce((a, k) => a + this.ticket(k).pts, 0);
+    const totalPts = tickets.reduce((a, t) => a + t.pts, 0);
+    const plannedPts = Object.keys(s.assign).reduce((a, k) => {
+      const t = ticketOf(k);
+      return a + (t ? t.pts : 0);
+    }, 0);
     const teamCap = s.people.reduce((a, p) => a + p.cap * nVisible, 0);
     const fillPct = teamCap ? Math.min(100, (plannedPts / teamCap) * 100) : 0;
     const multiOn = !!s.multiSprint;
+    const featureNames = FeatureFlags.listFeatures(this.TICKETS);
+    const featureToggles = featureNames.map(name => ({
+      name,
+      on: s.featureFlags[name] !== false,
+      onChange: (e) => this.setFeatureFlag(name, !!(e && e.target && e.target.checked))
+    }));
 
     const T = s.toast;
     const tone = {
@@ -1361,7 +1441,9 @@ class Component extends DCLogic {
       dayPx, ganttMinW: 232 + totalDays * dayPx,
       plannedPts, totalPts, usedPts: plannedPts, teamCap,
       fillPct, fillColor: fillPct > 100 ? 'oklch(0.6 0.16 27)' : 'oklch(0.66 0.11 155)',
-      unassignedCount: this.TICKETS.length - Object.keys(s.assign).length,
+      unassignedCount: tickets.length - Object.keys(s.assign).length,
+      showFeatures: featureNames.length > 0,
+      featureToggles,
       sprintName: this.SPRINT.name, sprintSub,
       undo: this.undo, redo: this.redo, clearAll: this.clearAll, addPerson: this.addPerson,
       savePlan: this.savePlan, loadPlan: this.loadPlan, downloadTickets: this.downloadTickets, savedNote: s.savedAt ? 'Saved ' + s.savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
@@ -1377,7 +1459,7 @@ class Component extends DCLogic {
       onGraphBgClick: this.onGraphBgClick,
       graphHint: s.graphEdit
         ? (s.pendingParent ? `${s.pendingParent} selected · click a child` : 'click a parent, then a child · −/+ to resize')
-        : `${this.TICKETS.length - Object.keys(s.assign).length} tickets left · drag one onto a teammate`,
+        : `${tickets.length - Object.keys(s.assign).length} tickets left · drag one onto a teammate`,
       editTitle: s.graphEdit ? 'Exit edit mode' : 'Edit estimates and dependencies',
       editBorder: s.graphEdit ? '#2A2721' : '#E4DFD5',
       editBg: s.graphEdit ? '#2A2721' : '#FFF',

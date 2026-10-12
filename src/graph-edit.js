@@ -32,7 +32,11 @@
   }
 
   function cloneTickets(tickets) {
-    return (tickets || []).map(t => Object.assign({}, t, { deps: ((t && t.deps) || []).slice() }));
+    return (tickets || []).map(t => {
+      const next = Object.assign({}, t, { deps: ((t && t.deps) || []).slice() });
+      if (t && Array.isArray(t.features)) next.features = t.features.slice();
+      return next;
+    });
   }
 
   function wouldCycle(tickets, parentId, childId) {
@@ -195,13 +199,17 @@
       sprint: { name: sp.name, start: sp.start, days: sp.days },
       sizes: sizesOut,
       epics: epics || [],
-      tickets: (tickets || []).map(t => ({
-        id: t.id,
-        epic: t.epic,
-        title: t.title,
-        pts: t.pts,
-        deps: ((t.deps) || []).slice()
-      }))
+      tickets: (tickets || []).map(t => {
+        const row = {
+          id: t.id,
+          epic: t.epic,
+          title: t.title,
+          pts: t.pts,
+          deps: ((t.deps) || []).slice()
+        };
+        if (Array.isArray(t.features) && t.features.length) row.features = t.features.slice();
+        return row;
+      })
     };
   }
 

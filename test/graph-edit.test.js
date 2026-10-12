@@ -169,6 +169,20 @@ function makePlan(ticketList, sprintDays, maxSprints, strict) {
 }
 
 {
+  const src = [
+    { id: 'A', epic: 'E', title: 'a', pts: 1, deps: [], features: ['payments'] },
+    { id: 'B', epic: 'E', title: 'b', pts: 2, deps: ['A'] }
+  ];
+  const copy = G.cloneTickets(src);
+  assert.deepStrictEqual(copy[0].features, ['payments']);
+  copy[0].features.push('x');
+  assert.deepStrictEqual(src[0].features, ['payments'], 'clone copies features array');
+  const out = G.exportTickets({ name: 'S', start: '2026-01-01', days: 10 }, { 1: { tshirt: 'XS', days: 1 } }, [], src);
+  assert.deepStrictEqual(out.tickets[0].features, ['payments']);
+  assert.strictEqual(out.tickets[1].features, undefined);
+}
+
+{
   assert.deepStrictEqual(G.findCycles(tickets()), [], 'acyclic');
 }
 
