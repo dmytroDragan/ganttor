@@ -1,6 +1,7 @@
-/** Auto-plan: greedy earliest-finish scheduler with epic stickiness for sprint planner. */
+/** Auto-plan: epic-batched earliest-finish scheduler with same-epic stickiness for sprint planner. */
 (function (root) {
   const DEFAULTS = { switchGainDays: 2, maxSkewPct: 25 };
+  const KIND_RANK = { same: 0, idle: 1, switch: 2 };
 
   function criticalPath(tickets, daysOf) {
     const byId = {};
@@ -59,15 +60,14 @@
       tickById[t.id] = t;
     });
     const cp = criticalPath(tickets, daysOf);
-    const remaining = tickets.filter(t => !assign[t.id]).sort((a, b) =>
-      cp[b.id] - cp[a.id] || b.pts - a.pts || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const byPriority = (a, b) => cp[b.id] - cp[a.id] || b.pts - a.pts || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    const pending = new Set(tickets.filter(t => !assign[t.id]).map(t => t.id));
     const planned = [];
     const skipped = [];
 
-    remaining.forEach(t => {
-      const blocked = (t.deps || []).filter(d => tickById[d] && !next[d]);
-      if (blocked.length) { skipped.push({ id: t.id, hint: 'Blocked' }); return; }
-
+    // Earliest finish among teammates, but a teammate already on this epic is kept
+    // unless another one finishes at least switchGainDays earlier or load skew is high.
+    const place = (t) => {
       const cands = [];
       let firstErr = null;
       people.forEach((p, order) => {
@@ -75,40 +75,53 @@
         if (r.error) { if (!firstErr) firstErr = r; return; }
         const si = Math.floor(r.start / sprintDays);
         const prev = lastEpic(p.id, next, epicOf);
+        const kind = prev === null ? 'idle' : prev === t.epic ? 'same' : 'switch';
         cands.push({
-          pid: p.id,
-          start: r.start,
-          days: r.days,
-          finish: r.start + r.days,
-          si,
-          load: loadIn(p.id, next, ptsOf, si, sprintDays),
-          isSwitch: prev !== null && prev !== t.epic,
-          order
+          pid: p.id, start: r.start, days: r.days, finish: r.start + r.days,
+          kind, si, cap: p.cap, load: loadIn(p.id, next, ptsOf, si, sprintDays), order
         });
       });
-      if (!cands.length) { skipped.push({ id: t.id, hint: firstErr.hint }); return; }
-
-      cands.sort((a, b) => a.finish - b.finish
-        || (a.isSwitch - b.isSwitch)
-        || a.load - b.load
-        || a.order - b.order);
+      if (!cands.length) return { hint: firstErr.hint };
+      cands.sort((a, b) => a.finish - b.finish || KIND_RANK[a.kind] - KIND_RANK[b.kind] || a.load - b.load || a.order - b.order);
       const best = cands[0];
+      const stay = cands.find(c => c.kind === 'same');
       let pick = best;
-      if (best.isSwitch) {
-        const sticky = cands.find(c => !c.isSwitch);
-        if (sticky) {
-          const pSticky = people.find(p => p.id === sticky.pid);
-          const teamMean = people.reduce((s, p) => s + pct(loadIn(p.id, next, ptsOf, sticky.si, sprintDays), p.cap), 0) / people.length;
-          const stickyAfter = pct(sticky.load + t.pts, pSticky.cap);
-          const gainOk = sticky.finish - best.finish >= o.switchGainDays;
-          const skewOk = stickyAfter - teamMean > o.maxSkewPct;
-          pick = gainOk || skewOk ? best : sticky;
-        }
+      if (stay && stay !== best) {
+        const teamMean = people.reduce((s, p) => s + pct(loadIn(p.id, next, ptsOf, stay.si, sprintDays), p.cap), 0) / people.length;
+        const stayAfter = pct(stay.load + t.pts, stay.cap);
+        const gainOk = stay.finish - best.finish >= o.switchGainDays;
+        const skewOk = stayAfter - teamMean > o.maxSkewPct;
+        if (!gainOk && !skewOk) pick = stay;
       }
+      return { pid: pick.pid, start: pick.start, days: pick.days };
+    };
 
-      next[t.id] = { personId: pick.pid, start: pick.start, days: pick.days };
-      planned.push(t.id);
-    });
+    // Batch by epic: finish the current epic's ready tickets before starting another epic.
+    let cur = null;
+    while (pending.size) {
+      const ready = [...pending].map(id => tickById[id])
+        .filter(t => !(t.deps || []).some(d => pending.has(d)));
+      if (!ready.length) {
+        // Dependency cycle: nothing can start.
+        [...pending].forEach(id => skipped.push({ id, hint: 'Blocked' }));
+        break;
+      }
+      const orphans = ready.filter(t => (t.deps || []).some(d => tickById[d] && !next[d]));
+      if (orphans.length) {
+        orphans.forEach(t => { pending.delete(t.id); skipped.push({ id: t.id, hint: 'Blocked' }); });
+        continue;
+      }
+      const inEpic = cur ? ready.filter(t => t.epic === cur) : [];
+      const t = (inEpic.length ? inEpic : ready).slice().sort(byPriority)[0];
+      cur = t.epic;
+      pending.delete(t.id);
+      const r = place(t);
+      if (r.hint) skipped.push({ id: t.id, hint: r.hint });
+      else {
+        next[t.id] = { personId: r.pid, start: r.start, days: r.days };
+        planned.push(t.id);
+      }
+    }
 
     return { assign: next, planned, skipped };
   }

@@ -51,8 +51,8 @@ function switches(assign, tickets) {
   const tk = [t('A1', 'A', 2), t('A2', 'A', 2), t('A3', 'A', 2), t('B1', 'B', 2), t('B2', 'B', 2), t('B3', 'B', 2)];
   const sticky = run(tk, {}, { switchGainDays: 99, maxSkewPct: 1000 });
   const eager = run(tk, {}, { switchGainDays: 0, maxSkewPct: 1000 });
-  assert.ok(switches(sticky.assign, tk) < switches(eager.assign, tk),
-    'high gain threshold keeps teammates on one epic longer than pure earliest-finish');
+  assert.strictEqual(switches(sticky.assign, tk), 0, 'epic batching keeps each teammate on one epic');
+  assert.ok(switches(eager.assign, tk) > 0, 'pure earliest-finish spreads epics across teammates');
 }
 
 {

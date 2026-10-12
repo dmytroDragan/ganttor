@@ -33,21 +33,28 @@ opts = { sprintDays, switchGainDays, maxSkewPct }
 planFn(t, pid, assign, people) -> planAssignment result
 ```
 
-### Ordering
+### Ordering (epic-batched)
 
-`criticalPath(tickets, daysOf)` returns `id -> own days + max criticalPath(children)`. Remaining tickets sort by critical path desc, then `pts` desc, then `id` asc. A parent's critical path is strictly greater than any descendant's, so the order is topological; strict dependency checks never fail for tickets whose parents are placeable.
+`criticalPath(tickets, daysOf)` returns `id -> own days + max criticalPath(children)`. Priority within the work list: critical path desc, then `pts` desc, then `id` asc.
+
+Scheduling runs one epic at a time:
+
+1. A ticket is ready when none of its dependencies are still pending. A ready ticket whose dependency was skipped is itself skipped with `Blocked`.
+2. If the current epic has ready tickets, take the highest-priority one. Otherwise the current epic becomes the epic of the highest-priority ready ticket overall.
+3. Place it, then repeat until nothing is pending.
 
 ### Candidate choice per ticket
 
 1. For every person call `planFn`; keep results without `error`, with `finish = start + days`.
-2. `switch(p)` is true when the person's latest-ending assigned ticket (in the working `assign`) belongs to a different epic. A person with no tickets is not a switch.
-3. Sort candidates: `finish` asc, no-switch before switch, pts already used in that sprint asc, team order. `best` = first.
-4. If `best` is a no-switch pick, take it.
-5. Otherwise `sticky` = first no-switch candidate. If none, take `best`.
-6. Take `best` when either holds, else take `sticky`:
-   - `sticky.finish - best.finish >= switchGainDays`
-   - `utilAfter(sticky) - teamMean > maxSkewPct`, where `utilAfter = (usedInSprint(sticky, si) + t.pts) / cap * 100`, `si` is the sprint the sticky placement lands in, and `teamMean` is the mean of `usedInSprint(p, si) / cap * 100` over all people.
-7. No candidate: push `{ id, hint }` to `skipped` using the first error's `hint`.
+2. Classify each candidate by the person's latest-ending assigned ticket in the working `assign`: `same` (same epic), `idle` (no tickets), `switch` (different epic).
+3. Sort candidates: `finish` asc, then `same` before `idle` before `switch`, then pts already used in that sprint asc, then team order. `best` = first.
+4. `stay` = earliest-finish `same` candidate. If there is none, or `stay` is `best`, take `best`.
+5. Otherwise take `best` only when one holds, else take `stay`:
+   - `stay.finish - best.finish >= switchGainDays`
+   - `utilAfter(stay) - teamMean > maxSkewPct`, where `utilAfter = (usedInSprint(stay, si) + t.pts) / cap * 100`, `si` is the sprint the stay placement lands in, and `teamMean` is the mean of `usedInSprint(p, si) / cap * 100` over all people.
+6. No candidate: push `{ id, hint }` to `skipped` using the first error's `hint`.
+
+Because `idle` teammates no longer count as "free to take the epic", a new epic is spread onto a second teammate only when the first one is `switchGainDays` or more behind, or overloaded.
 
 `switchGainDays = 0` yields pure earliest finish. `maxSkewPct = 100` disables the skew override.
 
