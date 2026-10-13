@@ -45,7 +45,7 @@ A teammate's most recently ending scheduled ticket belongs to a different epic t
 _Avoid_: Context switch (unless describing the goal)
 
 **Skew**:
-How far a teammate's load in one sprint sits above the team average, in percentage points of their capacity.
+How far a teammate's load in one sprint sits above the average of teammates who could take the ticket, in percentage points of their effective capacity.
 _Avoid_: Imbalance, variance
 
 **Block**:

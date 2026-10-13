@@ -183,6 +183,18 @@ function makePlan(ticketList, sprintDays, maxSprints, strict) {
 }
 
 {
+  const src = [
+    { id: 'A', epic: 'E', title: 'a', pts: 1, deps: [], roles: ['frontend'] },
+    { id: 'B', epic: 'E', title: 'b', pts: 2, deps: ['A'], roles: [] }
+  ];
+  const out = G.exportTickets({ name: 'S', start: '2026-01-01', days: 10 }, { 1: { tshirt: 'XS', days: 1 } }, [], src);
+  assert.deepStrictEqual(out.tickets[0].roles, ['frontend'], 'export keeps roles');
+  assert.strictEqual(out.tickets[1].roles, undefined, 'empty roles omitted like features');
+  src[0].roles.push('backend');
+  assert.deepStrictEqual(out.tickets[0].roles, ['frontend'], 'export copies roles array');
+}
+
+{
   assert.deepStrictEqual(G.findCycles(tickets()), [], 'acyclic');
 }
 

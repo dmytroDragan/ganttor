@@ -98,4 +98,38 @@ function switches(assign, tickets) {
   assert.ok(r.assign.OK, 'fitting ticket still planned');
 }
 
+{
+  // Teammates who cannot take the ticket do not lower the skew mean.
+  const ppl = [
+    { id: 'p1', name: 'Ann A', roles: ['frontend'], cap: 20 },
+    { id: 'p2', name: 'Ben B', roles: ['frontend'], cap: 20 },
+    { id: 'p3', name: 'Cy C', roles: ['qa'], cap: 20 },
+    { id: 'p4', name: 'Di D', roles: ['qa'], cap: 20 }
+  ];
+  const tk = [t('Y0', 'Y', 6, [], ['frontend']), t('Y1', 'Y', 2, [], ['frontend'])];
+  const pre = { Y0: { personId: 'p1', start: 0, days: 6 } };
+  const r = run(tk, pre, { switchGainDays: 99, maxSkewPct: 25 }, ppl);
+  assert.strictEqual(r.assign.Y1.personId, 'p1', 'QA teammates do not lower the skew mean');
+}
+
+{
+  // Skew compares each teammate against their effective capacity (blocked days removed).
+  const dates = ['d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9'];
+  const ppl = [
+    { id: 'p1', name: 'Ann A', roles: [], cap: 20, blocks: [{ start: 'd5', end: 'd9' }] },
+    { id: 'p2', name: 'Ben B', roles: [], cap: 20, blocks: [] }
+  ];
+  const tk = [t('Y0', 'Y', 2), t('Y1', 'Y', 2)];
+  const pre = { Y0: { personId: 'p1', start: 0, days: 2 } };
+  const planFn = (x, pid, a, p) => H.planAssignment(x, pid, a, p, tk, {
+    sprintDays: 10, maxSprints: 1, daysOf, strict: true, dates
+  });
+  const capOf = (p, si) => H.effectiveCap(p.cap, 10, H.blockedInSprint(H.blockDaySet(p.blocks, dates), si, 10));
+  const opts = { sprintDays: 10, daysOf, switchGainDays: 99, maxSkewPct: 25 };
+  const authored = AP.autoPlan(pre, ppl, tk, planFn, opts);
+  const effective = AP.autoPlan(pre, ppl, tk, planFn, Object.assign({ capOf }, opts));
+  assert.strictEqual(authored.assign.Y1.personId, 'p1', 'authored capacity: skew 15 keeps the ticket');
+  assert.strictEqual(effective.assign.Y1.personId, 'p2', 'effective capacity: skew 30 switches');
+}
+
 console.log('ok — auto-plan');

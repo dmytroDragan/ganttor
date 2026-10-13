@@ -1,6 +1,6 @@
 {
   "name": "ganttor",
-  "version": "0.7.1",
+  "version": "0.7.3",
   "private": true,
   "description": "Local sprint planner with a dependency graph and team Gantt board",
   "license": "MIT",

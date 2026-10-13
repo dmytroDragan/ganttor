@@ -51,7 +51,7 @@ Scheduling runs one epic at a time:
 4. `stay` = earliest-finish `same` candidate. If there is none, or `stay` is `best`, take `best`.
 5. Otherwise take `best` only when one holds, else take `stay`:
    - `stay.finish - best.finish >= switchGainDays`
-   - `utilAfter(stay) - teamMean > maxSkewPct`, where `utilAfter = (usedInSprint(stay, si) + t.pts) / cap * 100`, `si` is the sprint the stay placement lands in, and `teamMean` is the mean of `usedInSprint(p, si) / cap * 100` over all people.
+   - `utilAfter(stay) - teamMean > maxSkewPct`, where `utilAfter = (usedInSprint(stay, si) + t.pts) / effCap * 100`, `si` is the sprint the stay placement lands in, and `teamMean` is the mean of `usedInSprint(p, si) / effCap * 100` over teammates whose roles cover the ticket. `effCap` is the effective capacity for that sprint (blocked working days removed). Revised in 0.7.3; the original used authored `cap` and all teammates.
 6. No candidate: push `{ id, hint }` to `skipped` using the first error's `hint`.
 
 Because `idle` teammates no longer count as "free to take the epic", a new epic is spread onto a second teammate only when the first one is `switchGainDays` or more behind, or overloaded.

@@ -46,10 +46,16 @@
     return cap > 0 ? (used / cap) * 100 : 0;
   }
 
+  function canTake(t, p) {
+    const needed = (t.roles || []).filter(Boolean);
+    return !needed.length || needed.some(r => (p.roles || []).indexOf(r) >= 0);
+  }
+
   function autoPlan(assign, people, tickets, planFn, opts) {
     const o = Object.assign({}, DEFAULTS, opts || {});
     const sprintDays = o.sprintDays;
     const daysOf = o.daysOf || (pts => pts);
+    const capOf = o.capOf || (p => p.cap);
     const next = Object.assign({}, assign);
     const epicOf = {};
     const ptsOf = {};
@@ -78,7 +84,7 @@
         const kind = prev === null ? 'idle' : prev === t.epic ? 'same' : 'switch';
         cands.push({
           pid: p.id, start: r.start, days: r.days, finish: r.start + r.days,
-          kind, si, cap: p.cap, load: loadIn(p.id, next, ptsOf, si, sprintDays), order
+          kind, si, cap: capOf(p, si), load: loadIn(p.id, next, ptsOf, si, sprintDays), order
         });
       });
       if (!cands.length) return { hint: firstErr.hint };
@@ -87,7 +93,9 @@
       const stay = cands.find(c => c.kind === 'same');
       let pick = best;
       if (stay && stay !== best) {
-        const teamMean = people.reduce((s, p) => s + pct(loadIn(p.id, next, ptsOf, stay.si, sprintDays), p.cap), 0) / people.length;
+        // Mean over teammates who could take this ticket, each against their capacity in that sprint.
+        const pool = people.filter(p => canTake(t, p));
+        const teamMean = pool.reduce((s, p) => s + pct(loadIn(p.id, next, ptsOf, stay.si, sprintDays), capOf(p, stay.si)), 0) / pool.length;
         const stayAfter = pct(stay.load + t.pts, stay.cap);
         const gainOk = stay.finish - best.finish >= o.switchGainDays;
         const skewOk = stayAfter - teamMean > o.maxSkewPct;

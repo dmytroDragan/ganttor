@@ -49,11 +49,11 @@ Open [http://localhost:8000/](http://localhost:8000/).
 
 1. Sample checkout backlog ships in `data/tickets.json` and `data/team.json` — reload to fetch.  
 2. Drag a glowing (ready) ticket onto a teammate; click a Gantt bar to unassign.
-3. Click **Auto-plan** to schedule everything still unassigned; tune `gain ≥` (days) and `skew >` (%) in the header to control how strongly teammates stay on one epic. One ⌘Z undoes the whole run.  
+3. Click **Auto-plan** to schedule everything still unassigned; tune `gain ≥` (days) and `skew >` (%) in the header to control how strongly teammates stay on one epic (see [docs/gain-and-skew.md](docs/gain-and-skew.md)). One ⌘Z undoes the whole run.  
 4. Use **Features** checkboxes to hide a slice (e.g. turn off `3ds`); deps bridge across hidden tickets.  
 5. Turn on **Edit** to change estimates or dependencies.  
 6. Toggle **Multi-sprint** when work won’t fit in one sprint.  
-7. **Save plan** / **Download tickets** to keep the schedule and backlog edits (exports use the active feature projection).
+7. **Save plan** / **Download tickets** to keep the schedule and backlog edits (Download tickets always exports the full backlog, regardless of feature flags).
 
 ## Data files
 
@@ -74,7 +74,7 @@ Reload reads from disk. **Download tickets** / **Save plan** trigger browser dow
 - The plan stores **who/when** (and `featureFlags`), not the backlog. `tickets.json` stays source of truth for titles, pts, deps, `features`, and `roles`.  
 - On load, **duration is recomputed** from current story points → days (saved `durationDays` is ignored).  
 - Rows that don’t match a ticket or person are skipped; assignments are **repacked** so capacity and deps stay consistent.  
-- With features off, **Download tickets** / plan totals omit hidden tickets and use bridged deps; the in-memory backlog stays complete until you overwrite the JSON on disk.  
+- **Download tickets** always writes the full backlog: every ticket with its original `deps`, `features`, and `roles`, whether features are on or off. Plan totals still omit hidden tickets and use bridged deps.  
 - Auto-plan knobs come from `sprint.autoPlan` in `tickets.json` (defaults `switchGainDays: 2`, `maxSkewPct: 25`). Header edits apply for the session only and are not saved to `sprint-plan.json`; Download tickets keeps the JSON `sprint.autoPlan`.
 - Put a downloaded `sprint-plan.json` next to the HTML to auto-load on startup, or use **Load plan**.
 - The header shows `Plan: <file name>` for the last loaded plan (auto-loaded or via **Load plan**), so you can tell several saved plans apart.

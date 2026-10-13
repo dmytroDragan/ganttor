@@ -210,6 +210,7 @@
           deps: ((t.deps) || []).slice()
         };
         if (Array.isArray(t.features) && t.features.length) row.features = t.features.slice();
+        if (Array.isArray(t.roles) && t.roles.length) row.roles = t.roles.slice();
         return row;
       })
     };

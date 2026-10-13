@@ -98,7 +98,7 @@
       <sc-if value="{{ savedNote }}" hint-placeholder-val="{{ false }}">
         <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#A29C90;white-space:nowrap">{{ savedNote }}</span>
       </sc-if>
-      <button onClick="{{ downloadTickets }}" title="Download the current backlog (pts and deps) as tickets.json" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:#514C43;cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">
+      <button onClick="{{ downloadTickets }}" title="Download the full backlog (pts, deps, features, roles) as tickets.json, regardless of feature flags" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:#514C43;cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">
         <span style="font-family:'JetBrains Mono',monospace;font-size:13px">↓</span> Download tickets
       </button>
       <button onClick="{{ loadPlan }}" title="Import a previously saved sprint-plan.json" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:#514C43;cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">
@@ -923,8 +923,8 @@ class Component extends DCLogic {
   }
 
   downloadTickets = () => {
-    const vis = this.visibleTickets();
-    const out = GraphEdit.exportTickets(this.SPRINT, this.SIZES, this.EPICS, vis);
+    const all = this.TICKETS;
+    const out = GraphEdit.exportTickets(this.SPRINT, this.SIZES, this.EPICS, all);
     const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -932,7 +932,7 @@ class Component extends DCLogic {
     a.download = 'tickets.json';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    this.say('ok', `Downloaded tickets.json — ${vis.length} ticket${vis.length === 1 ? '' : 's'}`);
+    this.say('ok', `Downloaded tickets.json — ${all.length} ticket${all.length === 1 ? '' : 's'}`);
   };
 
   clearAll = () => {
@@ -950,10 +950,16 @@ class Component extends DCLogic {
   autoPlan = () => {
     const s = this.state;
     const tickets = this.visibleTickets();
+    const sprintDays = this.sprintDays();
+    const dates = this.dateIsos();
     const { assign, planned, skipped } = AutoPlan.autoPlan(
       s.assign, s.people, tickets,
       (t, pid, a, p) => this.planWithTickets(tickets, t, pid, a, p),
-      Object.assign({ sprintDays: this.sprintDays(), daysOf: (pts) => this.days(pts) }, s.autoPlanOpts)
+      Object.assign({
+        sprintDays,
+        daysOf: (pts) => this.days(pts),
+        capOf: (p, si) => SprintHorizon.effectiveCap(p.cap, sprintDays, SprintHorizon.blockedInSprint(SprintHorizon.blockDaySet(p.blocks, dates), si, sprintDays))
+      }, s.autoPlanOpts)
     );
     const more = skipped.length > 3 ? `, +${skipped.length - 3} more` : '';
     const left = skipped.length
