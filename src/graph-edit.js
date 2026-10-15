@@ -35,8 +35,75 @@
     return (tickets || []).map(t => {
       const next = Object.assign({}, t, { deps: ((t && t.deps) || []).slice() });
       if (t && Array.isArray(t.features)) next.features = t.features.slice();
+      if (t && Array.isArray(t.roles)) next.roles = t.roles.slice();
       return next;
     });
+  }
+
+  function suggestTicketId(tickets, epicId) {
+    const epic = epicId == null ? '' : String(epicId);
+    const re = new RegExp('^' + epic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-(\\d+)$');
+    let max = 100;
+    let found = false;
+    (tickets || []).forEach(t => {
+      const m = t && t.id != null && String(t.id).match(re);
+      if (!m) return;
+      found = true;
+      const n = +m[1];
+      if (n > max) max = n;
+    });
+    return found ? epic + '-' + (max + 1) : epic + '-101';
+  }
+
+  function listFeatureNames(tickets) {
+    const set = {};
+    (tickets || []).forEach(t => {
+      ((t && t.features) || []).forEach(f => { if (f) set[f] = true; });
+    });
+    return Object.keys(set).sort();
+  }
+
+  function createTicket(tickets, input, opts) {
+    const list = tickets || [];
+    const epicIds = (opts && opts.epicIds) || [];
+    const sizeKeys = (opts && opts.sizeKeys) || [];
+    const id = input && input.id != null ? String(input.id).trim() : '';
+    const title = input && input.title != null ? String(input.title).trim() : '';
+    const epic = input && input.epic;
+    const pts = input && input.pts;
+    if (!title) return { tickets: list, ticket: null, error: 'Title required' };
+    if (!id) return { tickets: list, ticket: null, error: 'Id required' };
+    if (list.some(t => t.id === id)) return { tickets: list, ticket: null, error: 'Id already exists' };
+    if (epicIds.indexOf(epic) < 0) return { tickets: list, ticket: null, error: 'Invalid epic' };
+    const ptsNum = +pts;
+    const sizeOk = sizeKeys.indexOf(ptsNum) >= 0 || sizeKeys.indexOf(pts) >= 0;
+    if (!sizeOk) return { tickets: list, ticket: null, error: 'Invalid points' };
+    const deps = ((input && input.deps) || []).slice();
+    for (let i = 0; i < deps.length; i++) {
+      const d = deps[i];
+      if (d === id) return { tickets: list, ticket: null, error: 'Cannot depend on itself' };
+      if (!list.some(t => t.id === d)) {
+        return { tickets: list, ticket: null, error: 'Unknown dependency: ' + d };
+      }
+    }
+    const ticket = { id, epic, title, pts: ptsNum, deps: deps.slice() };
+    const roles = ((input && input.roles) || []).filter(Boolean);
+    const features = ((input && input.features) || []).filter(Boolean);
+    if (roles.length) ticket.roles = roles.slice();
+    if (features.length) ticket.features = features.slice();
+    const next = cloneTickets(list);
+    const row = Object.assign({}, ticket, { deps: ticket.deps.slice() });
+    if (ticket.roles) row.roles = ticket.roles.slice();
+    else delete row.roles;
+    if (ticket.features) row.features = ticket.features.slice();
+    else delete row.features;
+    next.push(row);
+    for (let i = 0; i < deps.length; i++) {
+      if (wouldCycle(next, deps[i], id)) {
+        return { tickets: list, ticket: null, error: 'Would cycle: ' + deps[i] + ' → … → ' + id };
+      }
+    }
+    return { tickets: next, ticket: row, error: undefined };
   }
 
   function wouldCycle(tickets, parentId, childId) {
@@ -217,7 +284,8 @@
   }
 
   const api = {
-    stepPts, wouldCycle, findCycles, formatCycles, addDep, removeDep, setPts, cloneTickets, refreshAssign, exportTickets
+    stepPts, wouldCycle, findCycles, formatCycles, addDep, removeDep, setPts, cloneTickets, refreshAssign, exportTickets,
+    suggestTicketId, listFeatureNames, createTicket
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.GraphEdit = api;

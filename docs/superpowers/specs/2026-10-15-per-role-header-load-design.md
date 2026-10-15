@@ -1,7 +1,7 @@
 # Per-role header load strips
 
 **Date:** 2026-10-15  
-**Status:** approved (design)
+**Status:** implemented (v0.9.0)
 
 ## Goal
 

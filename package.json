@@ -1,11 +1,11 @@
 {
   "name": "ganttor",
-  "version": "0.7.3",
+  "version": "0.9.0",
   "private": true,
   "description": "Local sprint planner with a dependency graph and team Gantt board",
   "license": "MIT",
   "scripts": {
-    "test": "node --test test/unassign-recalc.test.js test/graph-row-order.test.js test/graph-epic-order.test.js test/sprint-horizon.test.js test/graph-edit.test.js test/graph-edge-arrow.test.js test/feature-flags.test.js test/roles.test.js test/auto-plan.test.js test/blocks.test.js",
+    "test": "node --test test/unassign-recalc.test.js test/graph-row-order.test.js test/graph-epic-order.test.js test/sprint-horizon.test.js test/graph-edit.test.js test/graph-edge-arrow.test.js test/feature-flags.test.js test/roles.test.js test/role-load.test.js test/auto-plan.test.js test/blocks.test.js",
     "start": "node server.js"
   }
 }

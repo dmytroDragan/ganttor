@@ -29,11 +29,13 @@ Local sprint planner: drag tickets from a dependency graph onto teammates and wa
 - **Dependency graph** — tickets by epic, arrows for parent → child, pending vs scheduled deps  
 - **Ready-ticket highlight** — unblocked work glows so you know what can go next  
 - **Feature flags** — optional `features` on tickets; toggle slices off the map/Gantt (deps bridge across gaps)  
-- **Role limits** — optional `roles` on tickets; only teammates sharing a role can take them (unconstrained = anyone)  
+- **Role limits** — optional `roles` on tickets; only teammates sharing a role can take them (unconstrained = anyone); with multiple roles in `team.json`, the header shows Planned / Capacity / Fill **per role**  
+
 - **Drag-and-drop assign** — drop onto a teammate; start day respects capacity, gaps, deps, and roles  
 - **Block day ranges** — optional per-person calendar `blocks` in `team.json`; gray on the Gantt, work can straddle (like weekends), effective capacity shrinks for those days  
 - **Auto-plan** — one click schedules every remaining ticket onto the team (roles, capacity, deps respected); keeps teammates on one epic unless switching finishes significantly earlier or load skew is high  
-- **Graph Edit** — step story points, add/remove deps (cycles blocked); plan refreshes after each change  
+- **Graph Edit** — step story points, add/remove deps (cycles blocked), **+ New ticket** popup (epic, id, title, pts, roles, features, deps); plan refreshes after each change; new tickets are included in **Download tickets**  
+
 - **Gantt + capacity** — per-person bars, utilization, planned vs team capacity  
 - **Multi-sprint, undo/redo, save/load** — plan beyond one sprint, ⌘Z history, download `sprint-plan.json` / `tickets.json`
 
@@ -51,7 +53,7 @@ Open [http://localhost:8000/](http://localhost:8000/).
 2. Drag a glowing (ready) ticket onto a teammate; click a Gantt bar to unassign.
 3. Click **Auto-plan** to schedule everything still unassigned; tune `gain ≥` (days) and `skew >` (%) in the header to control how strongly teammates stay on one epic (see [docs/gain-and-skew.md](docs/gain-and-skew.md)). One ⌘Z undoes the whole run.  
 4. Use **Features** checkboxes to hide a slice (e.g. turn off `3ds`); deps bridge across hidden tickets.  
-5. Turn on **Edit** to change estimates or dependencies.  
+5. Turn on **Edit** to change estimates or dependencies, or **+ New ticket** for a new backlog row (saved with **Download tickets**).  
 6. Toggle **Multi-sprint** when work won’t fit in one sprint.  
 7. **Save plan** / **Download tickets** to keep the schedule and backlog edits (Download tickets always exports the full backlog, regardless of feature flags).
 

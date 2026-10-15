@@ -1,7 +1,7 @@
 # Create ticket in edit mode
 
 **Date:** 2026-10-15  
-**Status:** approved (design)
+**Status:** implemented (v0.8.0)
 
 ## Goal
 

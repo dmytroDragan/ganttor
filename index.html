@@ -13,6 +13,7 @@
 <script src="./src/sprint-horizon.js"></script>
 <script src="./src/auto-plan.js"></script>
 <script src="./src/feature-flags.js"></script>
+<script src="./src/role-load.js"></script>
 </head>
 <body>
 <x-dc>
@@ -49,27 +50,58 @@
       <div style="font-size:11.5px;color:#8A857B">{{ sprintSub }}</div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:22px;margin-left:8px">
-      <div style="display:flex;flex-direction:column;gap:5px">
-        <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Planned</div>
-        <div style="display:flex;align-items:baseline;gap:5px">
-          <span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600">{{ plannedPts }}</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A857B">/ {{ totalPts }} pts</span>
+    <div style="display:flex;align-items:center;gap:18px;margin-left:8px;flex-wrap:wrap;min-width:0">
+      <sc-if value="{{ showTeamLoad }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:center;gap:22px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Planned</div>
+            <div style="display:flex;align-items:baseline;gap:5px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600">{{ plannedPts }}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A857B">/ {{ totalPts }} pts</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Team capacity</div>
+            <div style="display:flex;align-items:baseline;gap:5px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600">{{ usedPts }}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A857B">/ {{ teamCap }} pts</span>
+            </div>
+          </div>
+          <div style="width:180px;display:flex;flex-direction:column;gap:7px">
+            <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Fill</div>
+            <div style="position:relative;height:8px;border-radius:99px;background:#F0ECE4;overflow:hidden">
+              <div style="position:absolute;left:0;top:0;bottom:0;border-radius:99px;transition:width .45s cubic-bezier(.2,.9,.3,1);width:{{ fillPct }}%;background:{{ fillColor }}"></div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:5px">
-        <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Team capacity</div>
-        <div style="display:flex;align-items:baseline;gap:5px">
-          <span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600">{{ usedPts }}</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A857B">/ {{ teamCap }} pts</span>
-        </div>
-      </div>
-      <div style="width:180px;display:flex;flex-direction:column;gap:7px">
-        <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Fill</div>
-        <div style="position:relative;height:8px;border-radius:99px;background:#F0ECE4;overflow:hidden">
-          <div style="position:absolute;left:0;top:0;bottom:0;border-radius:99px;transition:width .45s cubic-bezier(.2,.9,.3,1);width:{{ fillPct }}%;background:{{ fillColor }}"></div>
-        </div>
-      </div>
+      </sc-if>
+      <sc-if value="{{ showRoleLoads }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ roleLoads }}" as="rl" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:14px;padding:4px 10px 4px 0;border-right:1px solid #EBE7DF">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#8A857B;min-width:4.5em">{{ rl.id }}</div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Planned</div>
+              <div style="display:flex;align-items:baseline;gap:4px">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600">{{ rl.planned }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A857B">/ {{ rl.demand }} pts</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Capacity</div>
+              <div style="display:flex;align-items:baseline;gap:4px">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600">{{ rl.planned }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A857B">/ {{ rl.capacity }} pts</span>
+              </div>
+            </div>
+            <div style="width:88px;display:flex;flex-direction:column;gap:5px">
+              <div style="font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#A29C90">Fill</div>
+              <div style="position:relative;height:7px;border-radius:99px;background:#F0ECE4;overflow:hidden">
+                <div style="position:absolute;left:0;top:0;bottom:0;border-radius:99px;transition:width .45s cubic-bezier(.2,.9,.3,1);width:{{ rl.fillPct }}%;background:{{ rl.fillColor }}"></div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </sc-if>
     </div>
 
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
@@ -116,7 +148,6 @@
     <section style="flex:{{ graphSectionFlex }};min-width:{{ graphMinW }};display:flex;flex-direction:column;min-height:0;border-right:{{ graphSectionBorder }};background:#FBFAF8">
       <div style="flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:13px 22px 11px;border-bottom:1px solid #F0ECE4">
         <div style="font-size:12px;font-weight:600;letter-spacing:.02em">Dependency graph</div>
-        <div style="font-size:11.5px;color:#A29C90">{{ graphHint }}</div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:7px">
           <sc-if value="{{ showFeatures }}" hint-placeholder-val="{{ false }}">
             <div style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:8px;border:1px solid #E4DFD5;background:#FFF">
@@ -135,6 +166,11 @@
             </span>
             Edit
           </button>
+          <sc-if value="{{ showCreateTicketBtn }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ openCreateTicket }}" title="Create a new ticket" style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;border:1px dashed #DCD5C8;background:transparent;font-family:inherit;font-size:12px;font-weight:600;color:#8A857B;cursor:pointer;transition:background .15s,border-color .15s,color .15s" style-hover="background:#FAF7F1;border-color:#B5AEA1;color:#514C43">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px">+</span> New ticket
+            </button>
+          </sc-if>
           <button onClick="{{ toggleGraphFullscreen }}" title="{{ graphFsTitle }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border-radius:8px;border:1px solid #E4DFD5;background:#FFF;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:#514C43;cursor:pointer;transition:background .15s,border-color .15s" style-hover="background:#F7F4EE;border-color:#D8D2C6">{{ graphFsIcon }}</button>
           <span title="Dependency ticket not assigned yet" style="display:inline-flex;align-items:center;gap:5px">
             <svg width="28" height="8" viewBox="0 0 28 8" aria-hidden="true"><path d="M1.5,4 C10,4 14,4 20,4" fill="none" stroke="#DED8CC" stroke-width="1.5" stroke-linecap="round"></path><polygon points="26,4 20,1.4 20,6.6" fill="#DED8CC"></polygon></svg>
@@ -337,6 +373,78 @@
       </sc-if>
     </div>
   </sc-if>
+
+  <sc-if value="{{ showCreateTicketModal }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeCreateTicket }}" style="position:fixed;inset:0;z-index:40;background:rgba(40,34,22,.28);display:flex;align-items:center;justify-content:center;padding:20px">
+      <div onClick="{{ stopCreateTicketBubble }}" style="width:min(420px,100%);max-height:min(88vh,640px);overflow:auto;background:#FFF;border:1px solid #E4DFD5;border-radius:14px;box-shadow:0 18px 48px rgba(40,34,22,.22);padding:18px 18px 16px;display:flex;flex-direction:column;gap:12px;animation:popIn .2s ease both">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div style="font-size:15px;font-weight:700;letter-spacing:-0.02em;color:#1B1A17">New ticket</div>
+          <button onClick="{{ closeCreateTicket }}" title="Close" aria-label="Close" style="width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:#8A857B;font-size:18px;line-height:1;cursor:pointer">×</button>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:#8A857B;letter-spacing:.04em;text-transform:uppercase">
+          Epic
+          <select value="{{ createEpic }}" onChange="{{ onCreateEpic }}" style="width:100%;border:1px solid #E4DFD5;border-radius:8px;padding:7px 9px;background:#FBFAF8;font-family:inherit;font-size:13px;font-weight:500;color:#1B1A17">
+            <sc-for list="{{ createEpicOpts }}" as="o" hint-placeholder-count="2">
+              <option value="{{ o.id }}">{{ o.label }}</option>
+            </sc-for>
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:#8A857B;letter-spacing:.04em;text-transform:uppercase">
+          Id
+          <input value="{{ createId }}" onChange="{{ onCreateId }}" spellcheck="false" style="width:100%;border:1px solid #E4DFD5;border-radius:8px;padding:7px 9px;background:#FBFAF8;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:#1B1A17">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:#8A857B;letter-spacing:.04em;text-transform:uppercase">
+          Title
+          <input value="{{ createTitle }}" onChange="{{ onCreateTitle }}" spellcheck="true" style="width:100%;border:1px solid #E4DFD5;border-radius:8px;padding:7px 9px;background:#FBFAF8;font-family:inherit;font-size:13px;font-weight:500;color:#1B1A17">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:#8A857B;letter-spacing:.04em;text-transform:uppercase">
+          Points
+          <select value="{{ createPts }}" onChange="{{ onCreatePts }}" style="width:100%;border:1px solid #E4DFD5;border-radius:8px;padding:7px 9px;background:#FBFAF8;font-family:inherit;font-size:13px;font-weight:500;color:#1B1A17">
+            <sc-for list="{{ createPtsOpts }}" as="o" hint-placeholder-count="3">
+              <option value="{{ o.value }}">{{ o.label }}</option>
+            </sc-for>
+          </select>
+        </label>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:11px;font-weight:600;color:#8A857B;letter-spacing:.04em;text-transform:uppercase">Roles</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 12px;padding:8px 10px;border:1px solid #E4DFD5;border-radius:8px;background:#FBFAF8;min-height:36px">
+            <sc-for list="{{ createRoleOpts }}" as="o" hint-placeholder-count="2">
+              <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:#514C43;cursor:pointer;user-select:none;text-transform:none;letter-spacing:0">
+                <input type="checkbox" checked="{{ o.on }}" onChange="{{ o.onChange }}" style="margin:0;accent-color:#2A2721;cursor:pointer">
+                {{ o.name }}
+              </label>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:11px;font-weight:600;color:#8A857B;letter-spacing:.04em;text-transform:uppercase">Features</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 12px;padding:8px 10px;border:1px solid #E4DFD5;border-radius:8px;background:#FBFAF8;min-height:36px">
+            <sc-for list="{{ createFeatureOpts }}" as="o" hint-placeholder-count="2">
+              <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:#514C43;cursor:pointer;user-select:none;text-transform:none;letter-spacing:0">
+                <input type="checkbox" checked="{{ o.on }}" onChange="{{ o.onChange }}" style="margin:0;accent-color:#2A2721;cursor:pointer">
+                {{ o.name }}
+              </label>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:11px;font-weight:600;color:#8A857B;letter-spacing:.04em;text-transform:uppercase">Deps</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 12px;padding:8px 10px;border:1px solid #E4DFD5;border-radius:8px;background:#FBFAF8;max-height:120px;overflow:auto">
+            <sc-for list="{{ createDepOpts }}" as="o" hint-placeholder-count="3">
+              <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:#514C43;cursor:pointer;user-select:none;text-transform:none;letter-spacing:0">
+                <input type="checkbox" checked="{{ o.on }}" onChange="{{ o.onChange }}" style="margin:0;accent-color:#2A2721;cursor:pointer">
+                {{ o.name }}
+              </label>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+          <button onClick="{{ closeCreateTicket }}" style="padding:8px 13px;border-radius:9px;border:1px solid #E4DFD5;background:#FFF;font-family:inherit;font-size:12.5px;font-weight:500;color:#514C43;cursor:pointer">Cancel</button>
+          <button onClick="{{ submitCreateTicket }}" style="padding:8px 14px;border-radius:9px;border:1px solid #2A2721;background:#2A2721;font-family:inherit;font-size:12.5px;font-weight:600;color:#FBFAF8;cursor:pointer">Create</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
 </div>
 
 </x-dc>
@@ -375,6 +483,8 @@ class Component extends DCLogic {
 
   AVATARS = ['oklch(0.62 0.13 255)', 'oklch(0.62 0.13 155)', 'oklch(0.62 0.13 65)', 'oklch(0.62 0.13 320)', 'oklch(0.62 0.13 200)', 'oklch(0.62 0.13 20)'];
 
+  ROLE_CATALOG = ['frontend', 'backend', 'qa'];
+
   state = {
     people: [
       { id: 'p1', name: 'Maya Okonkwo', roles: ['frontend'], cap: 21, blocks: [] },
@@ -394,7 +504,9 @@ class Component extends DCLogic {
     autoPlanOpts: Object.assign({}, AutoPlan.DEFAULTS),
     ganttDayPx: 58,
     graphEdit: false,
-    pendingParent: null
+    pendingParent: null,
+    createTicketOpen: false,
+    createDraft: null
   };
 
   nextPid = 5;
@@ -426,6 +538,9 @@ class Component extends DCLogic {
       got.push('tickets.json');
     }
     if (tm.status === 'fulfilled' && tm.value) {
+      if (Array.isArray(tm.value.roles) && tm.value.roles.length) {
+        this.ROLE_CATALOG = tm.value.roles.filter(Boolean).slice();
+      }
       const list = Array.isArray(tm.value) ? tm.value : (tm.value.team || tm.value.people || []);
       if (list.length) {
         const people = list.map((p, i) => ({
@@ -616,6 +731,11 @@ class Component extends DCLogic {
     this.loadData().catch(() => this.setState({ source: 'built-in sample data (load failed)' }));
     this._key = (e) => {
       if (e.key === 'Escape') {
+        if (this.state.createTicketOpen) {
+          e.preventDefault();
+          this.closeCreateTicket();
+          return;
+        }
         if (this.state.pendingParent) {
           e.preventDefault();
           this.setState({ pendingParent: null });
@@ -819,7 +939,119 @@ class Component extends DCLogic {
   };
 
   toggleGraphEdit = () => {
-    this.setState(s => ({ graphEdit: !s.graphEdit, pendingParent: null }));
+    this.setState(s => {
+      const graphEdit = !s.graphEdit;
+      return {
+        graphEdit,
+        pendingParent: null,
+        createTicketOpen: graphEdit ? s.createTicketOpen : false,
+        createDraft: graphEdit ? s.createDraft : null
+      };
+    });
+  };
+
+  sizeKeys() {
+    return Object.keys(this.SIZES || {})
+      .map(k => +k)
+      .filter(n => !isNaN(n))
+      .sort((a, b) => a - b);
+  }
+
+  openCreateTicket = () => {
+    if (!this.state.graphEdit) return;
+    const epic = (this.EPICS[0] && this.EPICS[0].id) || '';
+    const suggestedId = GraphEdit.suggestTicketId(this.TICKETS, epic);
+    const keys = this.sizeKeys();
+    this.setState({
+      createTicketOpen: true,
+      createDraft: {
+        id: suggestedId,
+        suggestedId,
+        epic,
+        title: '',
+        pts: keys[0] || 1,
+        roles: {},
+        features: {},
+        deps: {}
+      }
+    });
+  };
+
+  closeCreateTicket = () => {
+    this.setState({ createTicketOpen: false, createDraft: null });
+  };
+
+  stopCreateTicketBubble = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+  };
+
+  patchCreateDraft(patch) {
+    this.setState(s => {
+      if (!s.createDraft) return null;
+      return { createDraft: Object.assign({}, s.createDraft, patch) };
+    });
+  }
+
+  onCreateEpic = (e) => {
+    const epic = e && e.target ? e.target.value : '';
+    this.setState(s => {
+      const d = s.createDraft;
+      if (!d) return null;
+      const next = Object.assign({}, d, { epic });
+      if (d.id === d.suggestedId) {
+        const suggestedId = GraphEdit.suggestTicketId(this.TICKETS, epic);
+        next.suggestedId = suggestedId;
+        next.id = suggestedId;
+      }
+      return { createDraft: next };
+    });
+  };
+
+  onCreateId = (e) => {
+    this.patchCreateDraft({ id: e && e.target ? e.target.value : '' });
+  };
+
+  onCreateTitle = (e) => {
+    this.patchCreateDraft({ title: e && e.target ? e.target.value : '' });
+  };
+
+  onCreatePts = (e) => {
+    const v = e && e.target ? +e.target.value : 1;
+    this.patchCreateDraft({ pts: isNaN(v) ? 1 : v });
+  };
+
+  toggleCreateFlag(field, name, on) {
+    this.setState(s => {
+      const d = s.createDraft;
+      if (!d) return null;
+      const map = Object.assign({}, d[field] || {});
+      map[name] = !!on;
+      const next = Object.assign({}, d);
+      next[field] = map;
+      return { createDraft: next };
+    });
+  }
+
+  submitCreateTicket = () => {
+    const d = this.state.createDraft;
+    if (!d) return;
+    const pick = (map) => Object.keys(map || {}).filter(k => map[k]);
+    const { tickets, error } = GraphEdit.createTicket(this.TICKETS, {
+      id: d.id,
+      epic: d.epic,
+      title: d.title,
+      pts: d.pts,
+      roles: pick(d.roles),
+      features: pick(d.features),
+      deps: pick(d.deps)
+    }, {
+      epicIds: this.EPICS.map(e => e.id),
+      sizeKeys: this.sizeKeys()
+    });
+    if (error) { this.say('error', error); return; }
+    const id = String(d.id || '').trim();
+    this.closeCreateTicket();
+    this.applyGraphEdit(tickets, null, `Created ${id}`);
   };
 
   onGraphBgClick = () => {
@@ -1556,12 +1788,52 @@ class Component extends DCLogic {
     }, 0);
     const teamCap = s.people.reduce((a, p) => a + this.effCapHorizon(p, nVisible, sprint, ganttDateIsos), 0);
     const fillPct = teamCap ? Math.min(100, (plannedPts / teamCap) * 100) : 0;
+    const roleCatalog = this.ROLE_CATALOG || [];
+    const showTeamLoad = roleCatalog.length <= 1;
+    const showRoleLoads = !showTeamLoad;
+    const roleLoads = showRoleLoads
+      ? RoleLoad.summarize(
+        roleCatalog,
+        s.people,
+        tickets,
+        s.assign,
+        (p) => this.effCapHorizon(p, nVisible, sprint, ganttDateIsos)
+      ).map(r => Object.assign({}, r, {
+        fillColor: r.fillPct > 100 ? 'oklch(0.6 0.16 27)' : 'oklch(0.66 0.11 155)'
+      }))
+      : [];
     const multiOn = !!s.multiSprint;
     const featureNames = FeatureFlags.listFeatures(this.TICKETS);
     const featureToggles = featureNames.map(name => ({
       name,
       on: s.featureFlags[name] !== false,
       onChange: (e) => this.setFeatureFlag(name, !!(e && e.target && e.target.checked))
+    }));
+
+    const draft = s.createDraft;
+    const createEpicOpts = this.EPICS.map(e => ({
+      id: e.id,
+      label: e.id + ' — ' + e.name
+    }));
+    const createPtsOpts = this.sizeKeys().map(n => {
+      const sz = this.SIZES[n] || {};
+      const t = sz.t || sz.tshirt || '';
+      return { value: String(n), label: t ? `${n} (${t})` : String(n) };
+    });
+    const createRoleOpts = (this.ROLE_CATALOG || []).map(name => ({
+      name,
+      on: !!(draft && draft.roles && draft.roles[name]),
+      onChange: (e) => this.toggleCreateFlag('roles', name, !!(e && e.target && e.target.checked))
+    }));
+    const createFeatureOpts = GraphEdit.listFeatureNames(this.TICKETS).map(name => ({
+      name,
+      on: !!(draft && draft.features && draft.features[name]),
+      onChange: (e) => this.toggleCreateFlag('features', name, !!(e && e.target && e.target.checked))
+    }));
+    const createDepOpts = this.TICKETS.map(t => ({
+      name: t.id,
+      on: !!(draft && draft.deps && draft.deps[t.id]),
+      onChange: (e) => this.toggleCreateFlag('deps', t.id, !!(e && e.target && e.target.checked))
     }));
 
     const T = s.toast;
@@ -1578,6 +1850,7 @@ class Component extends DCLogic {
       dayPx, ganttMinW: 232 + totalDays * dayPx,
       plannedPts, totalPts, usedPts: plannedPts, teamCap,
       fillPct, fillColor: fillPct > 100 ? 'oklch(0.6 0.16 27)' : 'oklch(0.66 0.11 155)',
+      showTeamLoad, showRoleLoads, roleLoads,
       unassignedCount: tickets.length - Object.keys(s.assign).length,
       showFeatures: featureNames.length > 0,
       featureToggles,
@@ -1597,10 +1870,26 @@ class Component extends DCLogic {
       showSplitBar: !s.graphFullscreen,
       toggleGraphFullscreen: this.toggleGraphFullscreen,
       toggleGraphEdit: this.toggleGraphEdit,
+      showCreateTicketBtn: !!s.graphEdit,
+      showCreateTicketModal: !!(s.createTicketOpen && draft),
+      openCreateTicket: this.openCreateTicket,
+      closeCreateTicket: this.closeCreateTicket,
+      stopCreateTicketBubble: this.stopCreateTicketBubble,
+      submitCreateTicket: this.submitCreateTicket,
+      createEpic: draft ? draft.epic : '',
+      createId: draft ? draft.id : '',
+      createTitle: draft ? draft.title : '',
+      createPts: draft ? String(draft.pts) : '',
+      createEpicOpts,
+      createPtsOpts,
+      createRoleOpts,
+      createFeatureOpts,
+      createDepOpts,
+      onCreateEpic: this.onCreateEpic,
+      onCreateId: this.onCreateId,
+      onCreateTitle: this.onCreateTitle,
+      onCreatePts: this.onCreatePts,
       onGraphBgClick: this.onGraphBgClick,
-      graphHint: s.graphEdit
-        ? (s.pendingParent ? `${s.pendingParent} selected · click a child` : 'click a parent, then a child · −/+ to resize')
-        : `${tickets.length - Object.keys(s.assign).length} tickets left · drag one onto a teammate`,
       editTitle: s.graphEdit ? 'Exit edit mode' : 'Edit estimates and dependencies',
       editBorder: s.graphEdit ? '#2A2721' : '#E4DFD5',
       editBg: s.graphEdit ? '#2A2721' : '#FFF',

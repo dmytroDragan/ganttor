@@ -241,4 +241,65 @@ function makePlan(ticketList, sprintDays, maxSprints, strict) {
   assert.strictEqual(G.formatCycles([]), '');
 }
 
+{
+  assert.strictEqual(G.suggestTicketId([], 'CHK'), 'CHK-101');
+  assert.strictEqual(
+    G.suggestTicketId([{ id: 'CHK-106', epic: 'CHK' }, { id: 'PAY-201', epic: 'PAY' }], 'CHK'),
+    'CHK-107'
+  );
+  assert.strictEqual(
+    G.suggestTicketId([{ id: 'CHK-101', epic: 'CHK' }, { id: 'CHK-103', epic: 'CHK' }], 'CHK'),
+    'CHK-104',
+    'max+1 not fill gaps'
+  );
+}
+
+{
+  assert.deepStrictEqual(
+    G.listFeatureNames([
+      { features: ['3ds', 'payments'] },
+      { features: ['payments'] },
+      { features: [] },
+      {}
+    ]),
+    ['3ds', 'payments']
+  );
+}
+
+{
+  const opts = { epicIds: ['CHK', 'PAY'], sizeKeys: [1, 2, 3, 5, 8] };
+  const base = [{ id: 'CHK-101', epic: 'CHK', title: 'a', pts: 1, deps: [] }];
+  const { tickets, ticket, error } = G.createTicket(base, {
+    id: 'CHK-102', epic: 'CHK', title: ' New work ', pts: 3,
+    roles: ['frontend'], features: ['payments'], deps: ['CHK-101']
+  }, opts);
+  assert.strictEqual(error, undefined);
+  assert.strictEqual(ticket.id, 'CHK-102');
+  assert.strictEqual(ticket.title, 'New work');
+  assert.deepStrictEqual(ticket.roles, ['frontend']);
+  assert.deepStrictEqual(ticket.features, ['payments']);
+  assert.deepStrictEqual(ticket.deps, ['CHK-101']);
+  assert.strictEqual(tickets.length, 2);
+  assert.strictEqual(base.length, 1, 'source unchanged');
+}
+
+{
+  const opts = { epicIds: ['CHK'], sizeKeys: [1, 2, 3] };
+  const base = [{ id: 'CHK-101', epic: 'CHK', title: 'a', pts: 1, deps: [] }];
+  assert.strictEqual(G.createTicket(base, { id: 'CHK-102', epic: 'CHK', title: '  ', pts: 1 }, opts).error, 'Title required');
+  assert.strictEqual(G.createTicket(base, { id: 'CHK-101', epic: 'CHK', title: 'x', pts: 1 }, opts).error, 'Id already exists');
+  assert.strictEqual(G.createTicket(base, { id: 'CHK-102', epic: 'CHK', title: 'x', pts: 1, deps: ['NOPE'] }, opts).error, 'Unknown dependency: NOPE');
+  assert.strictEqual(G.createTicket(base, { id: 'CHK-102', epic: 'CHK', title: 'x', pts: 1, deps: ['CHK-102'] }, opts).error, 'Cannot depend on itself');
+  const empty = G.createTicket(base, { id: 'CHK-102', epic: 'CHK', title: 'x', pts: 1, roles: [], features: [] }, opts);
+  assert.strictEqual(empty.ticket.roles, undefined);
+  assert.strictEqual(empty.ticket.features, undefined);
+}
+
+{
+  const src = [{ id: 'A', epic: 'E', title: 'a', pts: 1, deps: [], roles: ['frontend'] }];
+  const copy = G.cloneTickets(src);
+  copy[0].roles.push('backend');
+  assert.deepStrictEqual(src[0].roles, ['frontend'], 'clone copies roles array');
+}
+
 console.log('graph-edit.test.js: ok');
